@@ -1,4 +1,4 @@
-# Claude Code for the Non-Engineer
+# Wade In
 
 **Classification:** factory-output
 **Lifecycle:** active

@@ -1,4 +1,4 @@
-# Decisions: Claude Code for the Non-Engineer
+# Decisions: Wade In
 
 ## ADR Log
 

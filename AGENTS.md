@@ -1,4 +1,4 @@
-# Agent Context: Claude Code for the Non-Engineer
+# Agent Context: Wade In
 
 Teach non-technical knowledge workers, who have never used a terminal, to get real research/document/spreadsheet-adjacent/light-automation work done with Claude Code itself, gated by a deterministic checker script plus an AI-graded rubric, inside one continuing named scenario.
 

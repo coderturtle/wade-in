@@ -1,4 +1,4 @@
-# Operating Model: Claude Code for the Non-Engineer
+# Operating Model: Wade In
 
 ## Classification
 

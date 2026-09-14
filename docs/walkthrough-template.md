@@ -1,7 +1,7 @@
 # Walkthrough: {Session Title}
 
 **Date:** YYYY-MM-DD
-**Project:** Claude Code for the Non-Engineer
+**Project:** Wade In
 **Prompt / Session:** N
 
 ## What changed in plain English
@@ -10,7 +10,7 @@
 
 ## The simple analogy
 
-## How this ties to Claude Code for the Non-Engineer
+## How this ties to Wade In
 
 ## How this ties to the Hekton factory vision
 

@@ -1,4 +1,4 @@
-# Claude Code for the Non-Engineer — Plain-English Project Walkthrough
+# Wade In — Plain-English Project Walkthrough
 
 ## What this project is in one paragraph
 
