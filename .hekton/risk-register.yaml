@@ -15,3 +15,91 @@ risks:
     reviewed_date: 2026-09-14
     links:
       - "docs/risks.md"
+  - id: RISK-0002
+    title: "Module 01->02 authenticated-session gap"
+    category: design
+    likelihood: high
+    impact: high
+    status: open
+    owner: coderturtle
+    mitigation: "Add an authenticated-session check to Module 01, or design Module 02's opening as the login step, before Module 02 content is authored."
+    raised_date: 2026-09-14
+    reviewed_date: 2026-09-14
+    links:
+      - "docs/risks.md"
+      - "docs/workshop-design.md#14-open-design-questions"
+  - id: RISK-0003
+    title: "Platform decision undecided while checker contract is Unix-shaped"
+    category: design
+    likelihood: high
+    impact: high
+    status: open
+    owner: coderturtle
+    mitigation: "Decide macOS/Linux-first vs. dual-track vs. Windows-first before Module 01 content is authored."
+    raised_date: 2026-09-14
+    reviewed_date: 2026-09-14
+    links:
+      - "docs/risks.md"
+      - "docs/workshop-design.md#11-machine-account-and-platform-preflight"
+  - id: RISK-0004
+    title: "Checker answer keys ship inside the downloadable workshop folder"
+    category: design
+    likelihood: medium
+    impact: medium
+    status: open
+    owner: coderturtle
+    mitigation: "Soft control only (CLAUDE.md instruction not to read checks/); named limit, not solved."
+    raised_date: 2026-09-14
+    reviewed_date: 2026-09-14
+    links:
+      - "docs/risks.md"
+  - id: RISK-0005
+    title: "Tier 2 grading circularity and undefined completion contract"
+    category: design
+    likelihood: high
+    impact: medium
+    status: open
+    owner: coderturtle
+    mitigation: "Pin required-to-advance status, model policy, and retry/disagreement path at content time."
+    raised_date: 2026-09-14
+    reviewed_date: 2026-09-14
+    links:
+      - "docs/risks.md"
+  - id: RISK-0006
+    title: "No external validation anchor; entire validation burden on unrun mechanisms"
+    category: process
+    likelihood: high
+    impact: medium
+    status: open
+    owner: coderturtle
+    mitigation: "Run adversarial dry runs, Mock Learner Gremlin passes, and a real-human pilot before any completeness/gentleness claim ships."
+    raised_date: 2026-09-14
+    reviewed_date: 2026-09-14
+    links:
+      - "docs/risks.md"
+  - id: RISK-0007
+    title: "Real shell/file access in Module 09's real-file exercise"
+    category: safety
+    likelihood: low
+    impact: high
+    status: open
+    owner: coderturtle
+    mitigation: "Sandboxed by default for the whole graded arc except Module 09, which teaches a backup-first ritual as an explicit checker-verified skill."
+    raised_date: 2026-09-14
+    reviewed_date: 2026-09-14
+    links:
+      - "docs/risks.md"
+      - "docs/workshop-design.md#12-blast-radius-honesty-section"
+  - id: RISK-0008
+    title: "scaffold-project.sh gitignore default breaks the pre-push hook"
+    category: tooling
+    likelihood: low
+    impact: low
+    status: fixed_locally
+    owner: coderturtle
+    mitigation: "Deviated from the scaffold default in this repo's .gitignore, matching object-lesson's 2026-08-17 precedent. Upstream scaffold-project.sh bug remains open, tracked cross-workshop in docs/next-actions.md."
+    raised_date: 2026-09-14
+    reviewed_date: 2026-09-14
+    links:
+      - "docs/decisions.md"
+      - "docs/next-actions.md"

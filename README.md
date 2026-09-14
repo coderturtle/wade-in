@@ -1,21 +1,14 @@
 # Wade In
 
-**Classification:** factory-output
-**Lifecycle:** active
-**Owner:** coderturtle
-**Promotion target:** `none`
+> Open a real terminal for the first time, and leave able to get real work done with Claude Code - no coding, no CLI experience assumed.
 
-> Teach non-technical knowledge workers, who have never used a terminal, to get real research/document/spreadsheet-adjacent/light-automation work done with Claude Code itself, gated by a deterministic checker script plus an AI-graded rubric, inside one continuing named scenario.
+Wade In is a self-paced, public workshop teaching non-technical knowledge workers, who have never used a terminal, to use the real Claude Code CLI for research, document drafting, spreadsheet-adjacent tasks, and light file-based automation. Every exercise runs inside a workshop-provided sandbox on your own machine: a real, deterministic checker script tells you if you got it right, and an AI-graded pass covers the judgment calls a mechanical check can't.
 
-## Implementation Status
+**Status:** design and module skeleton complete for all ten modules; no exercise content authored yet. Not ready to start yet; watch this repo.
 
-- Scaffolded 2026-09-14 — initial setup in progress.
+## The arc
 
-## Documentation Contract
-
-Agents working here must inspect `.hekton/project.yaml` before structural changes, keep `docs/session-log.md` current, record meaningful design decisions in `docs/decisions.md`, and update `docs/next-actions.md` when the work queue changes.
-
-Vault mutation policy: see `vault_mutation_allowed` in `.hekton/project.yaml` (authoritative; defaults to false at scaffold time). The repo-local `mind-palace/` folder is only a mirror draft; do not write to the live vault unless `.hekton/project.yaml` says mutation is allowed and it is explicitly authorised in-session.
+Ten modules, starting from zero: a terminal-literacy module (what a command even is) before Claude Code ever enters the picture, then a steady ramp through prompting, file editing, running scripts safely, web research, document drafting, spreadsheet-shaped cleanup, and automation, then a module on doing all of this safely on your own real files, then a synthesis capstone. Full reasoning for the order, the scenario, and the gate design is in [Workshop Design](docs/workshop-design.md); the per-module breakdown and current skeleton status is in [Modules](modules/README.md).
 
 ## Quick Start
 
@@ -23,14 +16,14 @@ Vault mutation policy: see `vault_mutation_allowed` in `.hekton/project.yaml` (a
 # Add project-specific commands here
 ```
 
+## Build in public
+
+This workshop's own build is published as a dated journal at [coderturtle.github.io/wade-in](https://coderturtle.github.io/wade-in/) once the site exists and the first deploy is triggered - the maintainer's record of building the workshop and its reusable Gremlin tooling at the same time, written deliberately rather than auto-generated from session logs.
+
 ## Key Docs
 
-- [Session Log](docs/session-log.md)
-- [Decisions](docs/decisions.md)
-- [Risks](docs/risks.md)
-- [Project Walkthrough](docs/project-walkthrough.md)
-- [Next Actions](docs/next-actions.md)
-- [Operating Model](docs/operating-model.md)
-- [Human Understanding Check](docs/human-understanding-check.md)
-- [Depth Decision](docs/depth-decision.md)
-
+- [Workshop Design](docs/workshop-design.md): the audience, the two-tier deterministic-checker gate method, the scenario, and every named open design question
+- [Modules](modules/README.md): all ten modules, gate tiers, and current skeleton status
+- [Brand](docs/brand.md): voice, hard rules, and visual identity for published content
+- [Next Actions](docs/next-actions.md): what's being worked on now
+- [Maintainers](docs/maintainers.md): internal/agent-facing notes (classification, documentation contract, review-panel reports)
