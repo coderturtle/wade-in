@@ -269,6 +269,86 @@ case "$MODULE" in
       check "01-terminal/answers.txt has all three reflection answers, in your own words" fail
     fi
     ;;
+  02)
+    # 1. 02-meet/summary.txt exists at all.
+    SUMMARY="$ROOT/02-meet/summary.txt"
+    if [[ -s "$SUMMARY" ]]; then
+      check "02-meet/summary.txt exists and is non-empty" pass
+    else
+      check "02-meet/summary.txt exists and is non-empty" fail
+    fi
+
+    # 2. It's 3-5 lines -- counting real content lines, not blank ones, so a
+    #    trailing blank line from an editor doesn't wrongly fail a genuine
+    #    3-5-line summary.
+    if [[ -f "$SUMMARY" ]]; then
+      NONBLANK_LINES="$(grep -cv '^[[:space:]]*$' "$SUMMARY" 2>/dev/null || echo 0)"
+      if [[ "$NONBLANK_LINES" -ge 3 && "$NONBLANK_LINES" -le 5 ]]; then
+        check "summary.txt is 3-5 lines long (found $NONBLANK_LINES)" pass
+      else
+        check "summary.txt is 3-5 lines long (found $NONBLANK_LINES)" fail
+      fi
+    else
+      check "summary.txt is 3-5 lines long" fail
+    fi
+
+    # 3 & 4. The summary contains the venue's founding year and current
+    #    capacity -- both re-derived from the fixture itself at check time
+    #    (never an embedded key), so the check stays correct if the fixture
+    #    is ever revised, and so it's actually testing whether the summary
+    #    reflects the real source, not whether the learner guessed a number
+    #    this script happens to have memorized.
+    HISTORY_FIXTURE="$ROOT/fixtures/venue-history.txt"
+    FOUNDING_YEAR="$(grep -oE 'Double Deuce in [0-9]{4}' "$HISTORY_FIXTURE" 2>/dev/null | grep -oE '[0-9]{4}')"
+    CAPACITY="$(grep -oE 'fire marshal inspection, is [0-9]+' "$HISTORY_FIXTURE" 2>/dev/null | grep -oE '[0-9]+$')"
+    if [[ -z "$FOUNDING_YEAR" || -z "$CAPACITY" ]]; then
+      # The shipped fixture itself doesn't match its own expected shape --
+      # a workshop-folder integrity problem, not something the learner did.
+      check "summary.txt includes the founding year (couldn't read it from the workshop fixture - contact the workshop)" fail
+      check "summary.txt includes the current capacity (couldn't read it from the workshop fixture - contact the workshop)" fail
+    else
+      if [[ -f "$SUMMARY" ]] && grep -q "$FOUNDING_YEAR" "$SUMMARY"; then
+        check "summary.txt includes the founding year ($FOUNDING_YEAR)" pass
+      else
+        check "summary.txt includes the founding year ($FOUNDING_YEAR)" fail
+      fi
+      if [[ -f "$SUMMARY" ]] && grep -q "$CAPACITY" "$SUMMARY"; then
+        check "summary.txt includes the current capacity ($CAPACITY)" pass
+      else
+        check "summary.txt includes the current capacity ($CAPACITY)" fail
+      fi
+    fi
+
+    # 5. Own-words answers file: same discipline as Module 01 -- presence-
+    #    checked for genuine content, rejecting the literal placeholder text
+    #    from the module page itself.
+    ANSWERS02="$ROOT/02-meet/answers.txt"
+    PLACEHOLDER_PROMPT02="<what happened when Claude Code asked to create or write the file - what did you see, what did you choose?>"
+    PLACEHOLDER_WHY02="<in your own words, why does Claude Code ask before acting?>"
+    PLACEHOLDER_CHECKED02="<one specific thing you checked yourself before trusting the summary>"
+    if [[ -f "$ANSWERS02" ]]; then
+      MISSING_LABELS=()
+      declare -A PLACEHOLDER_FOR_02=(
+        ["PERMISSION_PROMPT:"]="$PLACEHOLDER_PROMPT02"
+        ["WHY_ASKS:"]="$PLACEHOLDER_WHY02"
+        ["WHAT_I_CHECKED:"]="$PLACEHOLDER_CHECKED02"
+      )
+      for label in "PERMISSION_PROMPT:" "WHY_ASKS:" "WHAT_I_CHECKED:"; do
+        LINE="$(grep -m1 "^$label" "$ANSWERS02" 2>/dev/null || true)"
+        VALUE="$(echo "$LINE" | sed "s/^$label//" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+        if [[ -z "$VALUE" || "$VALUE" == "${PLACEHOLDER_FOR_02[$label]}" ]]; then
+          MISSING_LABELS+=("$label")
+        fi
+      done
+      if [[ "${#MISSING_LABELS[@]}" -eq 0 ]]; then
+        check "02-meet/answers.txt has all three reflection answers, in your own words" pass
+      else
+        check "02-meet/answers.txt has all three reflection answers, in your own words (still needed: ${MISSING_LABELS[*]})" fail
+      fi
+    else
+      check "02-meet/answers.txt has all three reflection answers, in your own words" fail
+    fi
+    ;;
   *)
     echo "No checks defined yet for module '$MODULE'." >&2
     exit 2
