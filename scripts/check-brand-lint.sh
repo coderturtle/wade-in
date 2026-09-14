@@ -58,6 +58,12 @@ SCOPE_FILES=()
 while IFS= read -r -d '' f; do SCOPE_FILES+=("$f"); done < <(find modules -name '*.md' -print0 2>/dev/null)
 while IFS= read -r -d '' f; do SCOPE_FILES+=("$f"); done < <(find docs/build-log -name '*.md' -print0 2>/dev/null)
 while IFS= read -r -d '' f; do SCOPE_FILES+=("$f"); done < <(find site/src -type f \( -name '*.astro' -o -name '*.mdx' \) -print0 2>/dev/null)
+# workshop-folder/ ships to the learner directly (it's the downloaded exercise
+# folder itself, not a description of one) -- its prose files are published
+# content too. checks/*.sh is deliberately excluded: it's bash logic, not
+# learner-facing prose, and its comments legitimately use technical terms
+# (checksum, inode) that would false-positive against the banned-phrase list.
+while IFS= read -r -d '' f; do SCOPE_FILES+=("$f"); done < <(find workshop-folder -type f \( -name '*.md' -o -name '*.txt' \) -not -path 'workshop-folder/checks/*' -print0 2>/dev/null)
 
 echo "-- Brand lint (published content only) ----------------------------------"
 echo "  files checked: ${#SCOPE_FILES[@]}"
@@ -121,6 +127,7 @@ else
   [[ -f README.md ]] && LEARNER_FACING_FILES+=("README.md")
   while IFS= read -r -d '' f; do LEARNER_FACING_FILES+=("$f"); done < <(find modules -name '*.md' -print0 2>/dev/null)
   while IFS= read -r -d '' f; do LEARNER_FACING_FILES+=("$f"); done < <(find site/src -type f \( -name '*.astro' -o -name '*.mdx' \) -print0 2>/dev/null)
+  while IFS= read -r -d '' f; do LEARNER_FACING_FILES+=("$f"); done < <(find workshop-folder -type f \( -name '*.md' -o -name '*.txt' \) -not -path 'workshop-folder/checks/*' -print0 2>/dev/null)
 
   # Kept deliberately narrower than a first draft of docs/brand.md's own
   # prose list: "checker" and "the arc" were originally named there too, but

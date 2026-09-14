@@ -20,7 +20,7 @@ risks:
     category: design
     likelihood: high
     impact: high
-    status: open
+    status: closed
     owner: coderturtle
     mitigation: "Add an authenticated-session check to Module 01, or design Module 02's opening as the login step, before Module 02 content is authored."
     raised_date: 2026-09-14
@@ -33,7 +33,7 @@ risks:
     category: design
     likelihood: high
     impact: high
-    status: open
+    status: closed
     owner: coderturtle
     mitigation: "Decide macOS/Linux-first vs. dual-track vs. Windows-first before Module 01 content is authored."
     raised_date: 2026-09-14
@@ -111,6 +111,44 @@ risks:
     status: open
     owner: coderturtle
     mitigation: "Not force-upgraded unilaterally (breaking major-version bump). Same cross-workshop dependency decision heartbeat/copilot-fluent already flagged rather than fixed per-repo."
+    raised_date: 2026-09-14
+    reviewed_date: 2026-09-14
+    links:
+      - "docs/risks.md"
+      - "docs/next-actions.md"
+  - id: RISK-0010
+    title: "Module 01 checker untested on Linux/Windows"
+    category: tooling
+    likelihood: medium
+    impact: medium
+    status: open
+    owner: coderturtle
+    mitigation: "Test on real Linux and Windows (Git Bash) before trusting a real learner on those platforms."
+    raised_date: 2026-09-14
+    reviewed_date: 2026-09-14
+    links:
+      - "docs/next-actions.md"
+  - id: RISK-0011
+    title: "Checker hardening claims can be false until directly tested"
+    category: process
+    likelihood: medium
+    impact: medium
+    status: open
+    owner: coderturtle
+    mitigation: "Every future module's checker gets a fresh-context same-model AND cross-model adversarial pass that actually runs constructed attack scenarios, not just reads the code and trusts its own comments; every 'fixed' claim gets re-tested directly after the fix, not just after the finding (a first fix for finding #7 in the Codex round was itself still broken until re-tested)."
+    raised_date: 2026-09-14
+    reviewed_date: 2026-09-14
+    links:
+      - "docs/workshop-design.md"
+      - "wade-in-private/runs/2026-09-14-module-01-dry-run/codex-followup.md"
+  - id: RISK-0012
+    title: "workshop-folder/ is untracked in git"
+    category: process
+    likelihood: high
+    impact: medium
+    status: open
+    owner: coderturtle
+    mitigation: "Commit workshop-folder/ on the current branch before merging to main; verify the built ZIP/repo actually contains it before the download instruction goes live for a real learner."
     raised_date: 2026-09-14
     reviewed_date: 2026-09-14
     links:

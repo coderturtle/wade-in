@@ -4,7 +4,10 @@ Wade In's arc takes a learner who has never opened a terminal through ten module
 
 **Hands-on by design, not passive text.** No module here completes by reading it. Every module states a required gate before content exists: an artifact you produce, checked two ways. Every module also has a stated **takeaway**: something reusable you're meant to keep, not just proof you did the exercise. Named honestly: most modules' checked artifact and its takeaway are currently two separate things (the checked work is one file, the reusable pack piece is another) rather than the gate directly producing the takeaway - closing that gap for real is still an open design decision, not solved yet.
 
-> **Content status: skeleton only.** All ten modules below have a decided question, arc position, gate shape, and takeaway shape - that is what this page and each module's own README describe. None has an authored exercise, fixture, or checker script yet. That's the next phase, run one module at a time. See `docs/next-actions.md` for what happens next, and `docs/workshop-design.md` §14 for the open design questions that shape how content authoring starts (particularly the Module 01→02 login-step gap, which needs resolving before Module 02's real content gets written).
+> **Content status: Module 01 has real, authored content, fixtures, and a working checker script.
+> Modules 02-10 are still skeleton only** - a decided question, arc position, gate shape, and
+> takeaway shape, no authored exercise yet. That's the next phase, run one module at a time. See
+> `docs/next-actions.md` for what happens next.
 
 ## The gate, in plain terms
 
