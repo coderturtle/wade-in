@@ -36,18 +36,24 @@ the rest of this workshop actually looks like.
 ## Part 2: asking for something real
 
 Doc wants a short summary of the venue's history, pulled from `fixtures/venue-history.txt` -
-Garrett's own notes, still sitting in the file cabinet. Ask for it in your own words. Something
-like this works, but write your own version rather than copying this one exactly - part of what
-this module is checking is that you can actually phrase a request, not just paste one:
+Garrett's own notes, still sitting in the file cabinet. Ask for it in your own words - nothing
+checks the exact wording of your request, only the result, so feel free to phrase this however
+feels natural to you. Something like this works as a starting point:
 
 ```
-Read fixtures/venue-history.txt and write a 3-5 line summary to 02-meet/summary.txt.
-Make sure the summary includes the venue's founding year and its current capacity.
+Read fixtures/venue-history.txt and write a summary to 02-meet/summary.txt as exactly 3 to 5
+separate lines - one short point per line, each on its own line with a real line break between
+them, not one paragraph. Make sure the summary includes the venue's founding year and its
+current capacity.
 ```
 
-Being specific like this - which file to read, where to save the result, what it has to include -
-is most of what a good request looks like. A vague request ("summarize the venue's history
-somewhere") makes Claude Code guess at details you actually care about.
+Being specific like this matters for two different reasons. Which file to read, where to save the
+result, and what it has to include is most of what a good request looks like in general - a vague
+request ("summarize the venue's history somewhere") makes Claude Code guess at details you
+actually care about. The "each on its own line, not one paragraph" part is specific to this
+exercise: asked more loosely, Claude Code will often write a perfectly good summary as flowing
+prose instead of separate lines, and the checker below counts lines - so being explicit about the
+shape you want isn't just good practice here, it's required to pass.
 
 ## Part 3: the permission prompt
 
@@ -86,13 +92,16 @@ bash checks/check.sh 02
 
 This checks, for real: `02-meet/summary.txt` exists and is 3-5 lines long; it contains the venue's
 founding year and current capacity, both read by the checker directly from
-`fixtures/venue-history.txt` itself (not a number this script has memorized - if that source file
-ever changes, the check changes with it); and you've filled in a short answers file, in your own
-words (below). It prints `RESULT: PASS (n/n)` when everything's there.
+`fixtures/venue-history.txt` itself (not a number this script has memorized - if that source
+file's *facts* ever change, the check changes with them); and you've filled in a short answers
+file, in your own words (below). It prints `RESULT: PASS (n/n)` when everything's there.
 
-One honest limit, worth knowing: this check can confirm the summary file has the right shape and
-the right facts in it. It can't tell whether Claude Code actually produced those words versus you
-typing them in by hand - no local check can, and this workshop won't pretend otherwise.
+One honest limit, worth knowing: this check confirms the summary file has the right shape and the
+two required facts in it. It can't tell whether Claude Code actually produced those words versus
+you typing them in by hand, and it can't tell a genuine summary from three bare, thrown-together
+lines that technically contain the right numbers - no local check can catch either of those, and
+this workshop won't pretend otherwise. The point of doing this exercise for real isn't to satisfy
+a script; it's the habit Part 4 describes.
 
 **A short answers file.** Create `02-meet/answers.txt`, containing three lines, each starting with
 the label shown:

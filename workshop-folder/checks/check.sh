@@ -270,9 +270,16 @@ case "$MODULE" in
     fi
     ;;
   02)
-    # 1. 02-meet/summary.txt exists at all.
+    # 1. 02-meet/summary.txt exists for real -- not a symlink standing in for
+    #    one. Module 01's checker rejects a symlinked copy for the same
+    #    reason; this module dropped that convention on first authoring
+    #    (found by a fresh-context adversarial pass, reproduced directly: a
+    #    symlink to an outside file passed every downstream check identically
+    #    to a real file).
     SUMMARY="$ROOT/02-meet/summary.txt"
-    if [[ -s "$SUMMARY" ]]; then
+    if [[ -L "$SUMMARY" ]]; then
+      check "02-meet/summary.txt exists and is non-empty (found a symlink, not a real file)" fail
+    elif [[ -s "$SUMMARY" ]]; then
       check "02-meet/summary.txt exists and is non-empty" pass
     else
       check "02-meet/summary.txt exists and is non-empty" fail
@@ -280,8 +287,12 @@ case "$MODULE" in
 
     # 2. It's 3-5 lines -- counting real content lines, not blank ones, so a
     #    trailing blank line from an editor doesn't wrongly fail a genuine
-    #    3-5-line summary.
-    if [[ -f "$SUMMARY" ]]; then
+    #    3-5-line summary. "Line" means an actual line break, which is why
+    #    the module's own suggested prompt explicitly asks for separate
+    #    lines rather than a paragraph -- confirmed live against the real
+    #    `claude` CLI that a vaguer prompt reliably produces flowing prose
+    #    that fails this check on a perfectly correct, honest summary.
+    if [[ -f "$SUMMARY" && ! -L "$SUMMARY" ]]; then
       NONBLANK_LINES="$(grep -cv '^[[:space:]]*$' "$SUMMARY" 2>/dev/null || echo 0)"
       if [[ "$NONBLANK_LINES" -ge 3 && "$NONBLANK_LINES" -le 5 ]]; then
         check "summary.txt is 3-5 lines long (found $NONBLANK_LINES)" pass
@@ -294,10 +305,21 @@ case "$MODULE" in
 
     # 3 & 4. The summary contains the venue's founding year and current
     #    capacity -- both re-derived from the fixture itself at check time
-    #    (never an embedded key), so the check stays correct if the fixture
-    #    is ever revised, and so it's actually testing whether the summary
-    #    reflects the real source, not whether the learner guessed a number
-    #    this script happens to have memorized.
+    #    (never an embedded key), so the check stays correct if the fixture's
+    #    *values* ever change, and so it's actually testing whether the
+    #    summary reflects the real source, not whether the learner guessed a
+    #    number this script happens to have memorized. Named limit: this
+    #    extraction is anchored to the fixture's current exact wording, not
+    #    just its values -- an editorial rewrite of the surrounding sentence
+    #    (not just the numbers) would break extraction. It fails safe when
+    #    that happens (a clear "contact the workshop" message below, not a
+    #    silent false pass or false fail), but if `fixtures/venue-history.txt`
+    #    is ever revised, re-run this checker against a known-good summary
+    #    before shipping the change.
+    #    Matching is word-boundary anchored (`\b...\b`), not a bare
+    #    substring -- a bare substring match was demonstrated to accept a
+    #    summary containing "19620" or "2950" as if it contained the real
+    #    4-digit year or 3-digit capacity.
     HISTORY_FIXTURE="$ROOT/fixtures/venue-history.txt"
     FOUNDING_YEAR="$(grep -oE 'Double Deuce in [0-9]{4}' "$HISTORY_FIXTURE" 2>/dev/null | grep -oE '[0-9]{4}')"
     CAPACITY="$(grep -oE 'fire marshal inspection, is [0-9]+' "$HISTORY_FIXTURE" 2>/dev/null | grep -oE '[0-9]+$')"
@@ -307,12 +329,12 @@ case "$MODULE" in
       check "summary.txt includes the founding year (couldn't read it from the workshop fixture - contact the workshop)" fail
       check "summary.txt includes the current capacity (couldn't read it from the workshop fixture - contact the workshop)" fail
     else
-      if [[ -f "$SUMMARY" ]] && grep -q "$FOUNDING_YEAR" "$SUMMARY"; then
+      if [[ -f "$SUMMARY" && ! -L "$SUMMARY" ]] && grep -qE "\\b${FOUNDING_YEAR}\\b" "$SUMMARY"; then
         check "summary.txt includes the founding year ($FOUNDING_YEAR)" pass
       else
         check "summary.txt includes the founding year ($FOUNDING_YEAR)" fail
       fi
-      if [[ -f "$SUMMARY" ]] && grep -q "$CAPACITY" "$SUMMARY"; then
+      if [[ -f "$SUMMARY" && ! -L "$SUMMARY" ]] && grep -qE "\\b${CAPACITY}\\b" "$SUMMARY"; then
         check "summary.txt includes the current capacity ($CAPACITY)" pass
       else
         check "summary.txt includes the current capacity ($CAPACITY)" fail
@@ -321,12 +343,15 @@ case "$MODULE" in
 
     # 5. Own-words answers file: same discipline as Module 01 -- presence-
     #    checked for genuine content, rejecting the literal placeholder text
-    #    from the module page itself.
+    #    from the module page itself, and rejecting a symlink standing in
+    #    for a real file (same convention as check 1, above).
     ANSWERS02="$ROOT/02-meet/answers.txt"
     PLACEHOLDER_PROMPT02="<what happened when Claude Code asked to create or write the file - what did you see, what did you choose?>"
     PLACEHOLDER_WHY02="<in your own words, why does Claude Code ask before acting?>"
     PLACEHOLDER_CHECKED02="<one specific thing you checked yourself before trusting the summary>"
-    if [[ -f "$ANSWERS02" ]]; then
+    if [[ -L "$ANSWERS02" ]]; then
+      check "02-meet/answers.txt has all three reflection answers, in your own words (found a symlink, not a real file)" fail
+    elif [[ -f "$ANSWERS02" ]]; then
       MISSING_LABELS=()
       declare -A PLACEHOLDER_FOR_02=(
         ["PERMISSION_PROMPT:"]="$PLACEHOLDER_PROMPT02"
