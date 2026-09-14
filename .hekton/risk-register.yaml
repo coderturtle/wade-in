@@ -146,9 +146,9 @@ risks:
     category: process
     likelihood: high
     impact: medium
-    status: open
+    status: closed
     owner: coderturtle
-    mitigation: "Commit workshop-folder/ on the current branch before merging to main; verify the built ZIP/repo actually contains it before the download instruction goes live for a real learner."
+    mitigation: "Committed to agent/claude/module-01-content (7013050), same commit as the Codex-round fixes. Still open: confirming the merged main branch's built ZIP actually contains it, once this branch is merged."
     raised_date: 2026-09-14
     reviewed_date: 2026-09-14
     links:

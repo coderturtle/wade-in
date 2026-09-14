@@ -172,6 +172,12 @@ and carry on.
 A handful of commands will come up constantly. Try each one now, inside your workshop folder:
 
 - `pwd` - prints your current directory, in full. Useful any time you're not sure where you are.
+
+  **Quick check before you go further:** does the line `pwd` just printed end in your workshop
+  folder's name (`wade-in-workshop`, or whatever you called it)? If you closed and reopened your
+  terminal at any point since Part 2, it's started over from wherever it opens by default - not
+  wherever you last `cd`'d to - and the commands below need to run from inside your workshop
+  folder to work. If it doesn't match, `cd` back in now the same way you did in Part 2.
 - `mkdir -p 01-terminal/my-notes` - creates a new folder. `mkdir` means "make directory"; the `-p`
   means "and create any parent folders along the way too if they don't exist yet" - without it,
   this exact command would fail, since there's no `01-terminal` folder here yet for `my-notes` to
