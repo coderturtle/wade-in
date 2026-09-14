@@ -24,10 +24,12 @@ plus her spreadsheet - see `docs/workshop-design.md` §7, Module 08 row.
 
 ## Required gate (placeholder - shape decided now, real checker written later)
 
-- **Required checklist (primary):** a checker script confirms the renamed file set exactly matches
-  the set it derives from the mapping fixture (no extras, none missing, each one still the original
-  file, not a corrupted or regenerated one), and confirms each generated letter contains its row's
-  exact values from the spreadsheet with no unfilled template placeholders remaining.
+- **Required checklist (primary):** a checker script confirms the renamed set in `08-auto/photos/`
+  (25 delivery photos) exactly matches the set it derives from the mapping fixture (no extras, none
+  missing, each one's checksum matching its original - renamed, not corrupted or regenerated), and
+  confirms all 6 generated letters each contain their row's exact `name`, `date`, and `amount`
+  values from the spreadsheet, with zero unfilled template placeholders remaining (`{{` occurrence
+  count = 0).
 - **Short write-up (secondary):** could this same template-and-mapping approach run again next
   month with new inputs, and what would the learner change first.
 

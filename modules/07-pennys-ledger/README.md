@@ -25,10 +25,13 @@ the source-of-truth rule the checker enforces (the current owner's file wins on 
 
 ## Required gate (placeholder - shape decided now, real checker written later)
 
-- **Required checklist (primary):** a checker script recomputes the expected post-merge row count
-  and the expected ID set from the two pristine source files under the module's stated merge rule,
-  and confirms every surviving row's key fields match the correct source values, not just that the
-  right IDs are present.
+- **Required checklist (primary):** a checker script confirms `07-csv/bookings-clean.csv` has the
+  exact module-specified header row (given verbatim up front); row count equals the checker's own
+  recomputed post-dedup count from the two pristine source files under the stated merge rule; the
+  booking-ID set exactly equals the checker's recomputed expected set (no lost rows, no invented
+  rows); for every surviving ID, `name`, `event_date`, `deposit`, and `balance` exactly match that
+  ID's source-of-truth values; and `total_due` is arithmetically correct per row (the checker
+  recomputes `deposit + balance` for every row).
 - **Short write-up (secondary):** in plain words, what the merge rule did, which duplicates it
   collapsed, and how the learner satisfied themselves nothing was lost.
 

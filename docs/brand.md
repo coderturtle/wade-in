@@ -23,17 +23,30 @@ who has never opened a terminal and may be actively nervous about breaking somet
 to earn trust in the first two minutes or lose the learner before Module 01 even starts.
 
 **Tone rules:**
-- **Gloss every piece of terminal/CLI vocabulary on first use, every time it appears in
-  learner-facing copy.** Not just Hekton-internal jargon (the lesson `object-lesson`'s brand.md
-  already carries) — for this audience, "command," "directory," "PATH," "session," even "terminal"
-  itself need a one-line plain-English gloss the first time they appear. This factory's own Review
-  Panel confirmed this is a real, not hypothetical, risk for this workshop specifically (the
-  End-User/Target Learner persona, re-aimed to a zero-terminal-experience reader, found the design
-  doc's own internal/learner-facing text genuinely hard to disentangle at a glance).
+- **Gloss terminal/CLI vocabulary the first time it appears in real instructional content —
+  Module 01's own exercise text specifically, and anywhere else a learner needs the term to
+  complete a step.** Not just Hekton-internal jargon (the lesson `object-lesson`'s brand.md already
+  carries) — for this audience, "command," "directory," "PATH," "session," even "terminal" itself
+  need a one-line plain-English gloss where they're first load-bearing. **Scoped deliberately,
+  corrected after an adversarial review flagged the rule as written applying too bluntly:** a
+  high-level, incidental mention on the homepage or the modules index ("a learner who has never
+  opened a terminal") doesn't need a gloss — the sentence is already about the reader's
+  unfamiliarity with the term, so the context carries the meaning; gate the discipline for where a
+  learner actually needs the definition to act, primarily Module 01's real content once it's
+  authored (still skeleton-only as of this pass, so full compliance here is real, but
+  content-authoring-time, work). This factory's own Review Panel confirmed the underlying risk is
+  real, not hypothetical, for this workshop specifically (the End-User/Target Learner persona,
+  re-aimed to a zero-terminal-experience reader, found the design doc's own internal/learner-facing
+  text genuinely hard to disentangle at a glance).
 - **Maintainer/process vocabulary never appears in learner-facing copy.** "Tier 1," "Tier 2,"
-  "Coachgremlin," "self-attested," "grading key," "checker," "the arc," "Design Principle" — all of
-  it stays in `docs/`. A learner-facing module page describes what to do and what "done" looks like,
-  in plain language, never in this factory's own internal vocabulary. This is the single most
+  "Coachgremlin," "self-attested," "grading key," "Design Principle" — all of it stays in `docs/`.
+  A learner-facing module page describes what to do and what "done" looks like, in plain language,
+  never in this factory's own internal vocabulary. **Deliberately narrower than an earlier draft of
+  this list, corrected after an adversarial review caught the mismatch:** ordinary English words
+  like "checker" and "the arc" are not banned — they're plain language a first-time reader can parse
+  from context, unlike the genuinely opaque terms above. `scripts/check-brand-lint.sh`'s own
+  `MAINTAINER_TERMS` list is this rule's authoritative, mechanically-enforced scope; this prose
+  should stay in sync with it, not the other way around. This is the single most
   convergent finding from this workshop's own design-doc review chain (4 of 7 Review Panel personas,
   independently) — treat it as load-bearing, not a style preference.
 - **State only what's actually built, in the tense that's actually true.** Don't describe an
@@ -150,13 +163,18 @@ is still `[TBD]`, below.
 | Artifact | Reads |
 |---|---|
 | `README.md` | Title + tagline |
-| `site/` (once built) | Tone, hard rules, banned phrases, visual identity, vocabulary-leak safeguard |
+| `site/` | Tone, hard rules, banned phrases, visual identity, vocabulary-leak safeguard |
 | Module READMEs | Tone, hard rules, banned phrases, jargon-glossing rule, maintainer-vocabulary exclusion |
 | Build-log entries | Tone and voice rules (first person, warmth where earned, no hype) |
 
 ## [TBD]: items for later
 
-- [ ] Exact accent colour token (once site is built)
-- [ ] Favicon / wordmark treatment
-- [ ] Dark mode colour tokens
+The site now exists and inherits neutral placeholder values for all of these (see
+`site/src/styles/global.css` and `site/public/favicon.svg`) - they're functional defaults, not yet
+deliberate brand decisions, and still open:
+
+- [ ] Exact accent colour token (currently the neutral default inherited from `copilot-fluent`'s
+  starter, not a chosen Wade In accent)
+- [ ] Favicon / wordmark treatment (currently a placeholder ripple mark, not a considered choice)
+- [ ] Dark mode colour tokens (currently the same neutral defaults' dark variant, not tuned)
 - [ ] Terminal-transcript syntax highlighting/theme choice for code blocks

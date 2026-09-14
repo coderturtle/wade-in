@@ -30,9 +30,11 @@ rather than dressed up as mechanically verified.
 
 ## Required gate (placeholder - shape decided now, real checker written later)
 
-- **Required checklist (primary), structural only:** a checker script confirms a brief exists with
-  the required section headers, at least three source URLs from at least three distinct sites, and
-  a comparison table with no empty rows. It cannot confirm the claims themselves are true.
+- **Required checklist (primary), structural only:** a checker script confirms
+  `05-research/comparison-brief.md` exists with all 4 exact required section headers (a closed set),
+  at least 3 source URLs from at least 3 distinct hostnames (a count, not a pattern match), and
+  every claim row in the required comparison table non-empty (a count). It cannot confirm the
+  claims themselves are true.
 - **Short write-up (secondary):** do the cited sources actually support the claims made, and did the
   learner catch and flag anywhere the sources disagreed.
 

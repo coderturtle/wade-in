@@ -29,9 +29,11 @@ predecessor left with no totals computed - see `docs/workshop-design.md` §7, Mo
 
 ## Required gate (placeholder - shape decided now, real checker written later)
 
-- **Required checklist (primary):** a checker script recomputes the correct monthly total,
-  best-night, and worst-night figures independently from the pristine source files and confirms the
-  learner's report matches, while also confirming the source files themselves are unmodified.
+- **Required checklist (primary):** a checker script confirms `04-scripts/door-report.txt` exists
+  and contains the exact monthly total, best-night date+count, and worst-night date+count -
+  recomputed independently by the checker from the pristine source files (12 nightly
+  `door-count-*.txt` files), so a wrong script produces a wrong report and fails - while also
+  checksum-confirming the source files themselves are unmodified.
 - **Short write-up (secondary):** whether the learner asked for a plan first, ran it, and verified
   the result against at least one source file by hand.
 

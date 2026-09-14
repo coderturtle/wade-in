@@ -1,0 +1,17 @@
+---
+import BaseLayout from "./BaseLayout.astro";
+
+interface Props {
+  title: string;
+}
+
+const { title } = Astro.props;
+---
+
+<BaseLayout title={title} description={`Wade In - ${title}`}>
+  <article>
+    <div class="post-body mt-4">
+      <slot />
+    </div>
+  </article>
+</BaseLayout>

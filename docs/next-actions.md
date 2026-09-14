@@ -7,6 +7,7 @@
 - [x] Draft, adversarially critique, and reconcile `docs/workshop-design.md` (three-agent chain) — done 2026-09-14
 - [x] Run the Workshop Review Panel (7-persona pass) against the reconciled `docs/workshop-design.md` — done 2026-09-14, full report at `docs/review-panel/2026-09-14-initial-design.md`, findings applied to `docs/workshop-design.md` §14/§15
 - [x] Deliverables & branding: 10-module skeleton (`modules/`), brand layer (`docs/brand.md`, `docs/maintainers.md`, `docs/risks.md` populated), `scripts/check-brand-lint.sh` written and passing clean, wired into the pre-push hook — done 2026-09-14
+- [x] Design Principle 5 cross-model pass #2 (Codex, against Deliverables/branding + site skeleton, 13 confirmed findings) — done 2026-09-14, all applied except the deliberately-deferred Part 4 item below; see `docs/decisions.md`
 
 ## This Week
 
@@ -20,8 +21,12 @@ Design doc §14 items, in its own priority order — all block real module conte
 - [ ] Decide install-step placement: end of Module 01 vs. a separate setup interlude. §14 item 6.
 - [ ] Decide whether the sandbox should also be enforced via Claude Code's own permission-mode/allowed-directory settings, not instruction alone. §14 item 7.
 - [ ] Decide whether a permission-habituation counter-exercise should land earlier than Module 09. §14 item 8.
-- [ ] Build the site skeleton (Astro, vocabulary-leak-safe placeholder for skeleton-only modules per the non-engineering variant's standing safeguard) — no deploy yet
+- [x] Build the site skeleton (Astro, vocabulary-leak-safe placeholder for skeleton-only modules per the non-engineering variant's standing safeguard) — done 2026-09-14, `npm run build` and `astro check` both clean, placeholder verified against real built HTML (no "skeleton"/"Tier 1"/"required checklist" leaks); no deploy triggered, per the Human Gate
 - [ ] Cross-workshop: fix `scaffold-project.sh`'s default `.gitignore` so `scripts/setup-hooks.sh`/`scripts/check-mirror-drift.sh` aren't ignored by default in public-capable repos — same bug `object-lesson` found and worked around 2026-08-17, worked around again here 2026-09-14 (`docs/decisions.md`, `docs/risks.md` RISK-0008), still not fixed upstream
+- [ ] `npm audit` on `site/`'s fresh install found 5 vulnerabilities (1 critical, 1 high) on the shared `astro@^5.0.0` pin every workshop site in this factory uses — `npm audit fix --force` wants a breaking major-version bump; same cross-workshop dependency decision `heartbeat`/`copilot-fluent` already flagged rather than fixed per-repo, not resolved here either. See `docs/risks.md` RISK-0009
+- [ ] Get a human to enable GitHub Pages (source = GitHub Actions) and trigger `wade-in`'s first `workflow_dispatch` deploy, once real module content exists — not before, per `docs/workshop-design.md`'s own status line
+- [ ] Content-authoring time: give each module's Part 4 ("Exercise material to draw from") a real, specific pointer the way `object-lesson`'s own skeleton does (named books/tutorials/exercises), not the current generic pointer back to `docs/workshop-design.md` §7 — deliberately deferred out of this pass per Codex's cross-model finding, since real curriculum-source research is Coachgremlin's job, not a Deliverables-step task
+- [ ] **Separate, unrelated finding surfaced mid-session:** `copilot-fluent`'s live site (copilot-fluent.coderturtle.io) is stale — its only deploy (2026-09-12) predates the real content-authoring pass (commit `e6f2fda` and the Mock Learner Gremlin dogfood commits, all merged after). User confirmed a redeploy; blocked by the auto-mode permission classifier from being triggered directly in this session — user needs to run `gh workflow run deploy-pages.yml --repo coderturtle/copilot-fluent` themselves (or via a `!`-prefixed command in chat)
 
 ## Later
 

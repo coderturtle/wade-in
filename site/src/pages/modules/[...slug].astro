@@ -1,0 +1,79 @@
+---
+import { getCollection, render } from "astro:content";
+import type { CollectionEntry } from "astro:content";
+import ModuleLayout from "../../components/layout/ModuleLayout.astro";
+
+export async function getStaticPaths() {
+  const entries = await getCollection("modules");
+  return entries.map((entry) => ({
+    params: { slug: entry.id },
+    props: { entry },
+  }));
+}
+
+type Props = { entry: CollectionEntry<"modules"> };
+
+const { entry } = Astro.props;
+const { Content, headings } = await render(entry);
+// Title comes from the module README's own first heading, not frontmatter -
+// see src/content/config.ts for why these files carry no frontmatter.
+const title = headings.find((h) => h.depth === 1)?.text ?? entry.id;
+
+// Module READMEs are authored as maintainer-facing skeletons (the Workshop
+// Gremlin's 8-part template - "required checklist," "short write-up,"
+// "skeleton only," and internal cross-references to docs/workshop-design.md
+// are deliberate, established vocabulary for that audience, shared with
+// every prior workshop's own module skeletons). This site publishes module
+// content directly to learners (the non-engineering-variant pattern
+// established by copilot-fluent), so a skeleton-stage module must NOT render
+// its raw content here - that would ship internal build vocabulary as if it
+// were finished learner-facing copy, exactly the failure this workshop's own
+// Review Panel converged on hardest (4 of 7 personas). Render a plain
+// placeholder instead until a module's own "Skeleton only" banner is gone,
+// meaning real learner-facing content has been authored to replace it.
+// Named limit, not a full fix: this is a plain substring check on the raw
+// markdown, not a structured status field. It fails open toward "still a
+// skeleton" (the safer direction - a false positive hides finished content
+// briefly; a false negative would leak internal vocabulary). Case-
+// insensitive so a capitalization slip in the banner doesn't invert that.
+const isSkeleton = entry.body?.toLowerCase().includes("skeleton only") ?? true;
+
+// The question this module answers is the one part of a skeleton worth
+// showing early - it's already learner-appropriate prose, not build
+// vocabulary. Extracted directly from the raw markdown rather than adding
+// frontmatter (see src/content/config.ts). Falls back to the title if the
+// heading text ever doesn't match this exact format.
+// Captures everything up to the next blank line (a paragraph, not just one
+// physical source line), then collapses internal line-wraps to spaces -
+// several module READMEs wrap this sentence across two source lines, and an
+// earlier version of this regex ([^\n]+) silently truncated the question at
+// the first line break (found live in the built site: Module 04, 05, 06, and
+// 10's questions all lost their final clause).
+const questionMatch = entry.body?.match(
+  /## The question this module answers\s*\n+([\s\S]+?)(?=\n\s*\n|$)/,
+);
+const question = questionMatch?.[1]?.trim().replace(/\s*\n\s*/g, " ") || title;
+---
+
+<ModuleLayout title={title}>
+  {
+    isSkeleton ? (
+      <>
+        <h1 class="text-4xl font-bold leading-tight tracking-tight">{title}</h1>
+        <p class="mt-4 text-lg opacity-80">{question}</p>
+        <p class="mt-8 opacity-70">
+          This module's real exercise isn't built yet. Watch the{" "}
+          <a href={`${import.meta.env.BASE_URL}build-log/`} class="underline">
+            build log
+          </a>{" "}
+          for progress, or see the design work in progress on{" "}
+          <a href="https://github.com/coderturtle/wade-in" class="underline">
+            GitHub
+          </a>.
+        </p>
+      </>
+    ) : (
+      <Content />
+    )
+  }
+</ModuleLayout>

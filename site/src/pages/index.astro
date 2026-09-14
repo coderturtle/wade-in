@@ -1,0 +1,95 @@
+---
+import { getCollection } from "astro:content";
+import BaseLayout from "../components/layout/BaseLayout.astro";
+
+const REPO = "https://github.com/coderturtle/wade-in";
+const base = import.meta.env.BASE_URL;
+
+const recentEntries = (await getCollection("buildlog", ({ data }) => !data.draft))
+  .sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf())
+  .slice(0, 3);
+---
+
+<BaseLayout
+  title="Wade In: guide"
+  description="Open a real terminal for the first time, and leave able to get real work done with Claude Code."
+>
+  <h1 class="text-3xl font-bold">Wade In</h1>
+  <p class="mt-2 text-lg opacity-80">
+    Open a real terminal for the first time, and leave able to get real work done with Claude Code.
+  </p>
+
+  <div class="post-body mt-10">
+    <p>
+      No coding background. No command-line experience. This workshop starts from a learner who has
+      never opened a terminal before and walks through ten modules, inside one continuing story, to
+      someone who can open a terminal, launch Claude Code, and do real research, document, and
+      spreadsheet-adjacent work with it, safely, on their own.
+    </p>
+
+    <h2>Who this is for</h2>
+    <p>
+      Non-technical knowledge workers who have never used a terminal or a command line. A computer
+      you control (can install software on), and a paid Claude account, are the prerequisites named
+      so far. Exact platform support (macOS, Windows, Linux) and the exact account/installation
+      details are still open design questions, not finalized yet - see the design doc if you want
+      the specifics as they firm up.
+    </p>
+
+    <h2>Two checks, every module (once each module's real exercise exists)</h2>
+    <p>
+      First, a <strong>required checklist</strong>: a short script, planned to ship inside the
+      workshop folder, that will check your work against a set of real facts, not a subjective "is
+      this good" call. Second, a <strong>short write-up, graded for you</strong>: a quick answer in
+      your own words, checked by an AI pass, for the judgment calls a script can't make on its own.
+      Neither exists yet for any module - see Current status, below.
+    </p>
+
+    <h2>The runbook</h2>
+    <ol>
+      <li>Prerequisites: a computer you control, and a paid Claude account with Claude Code access.</li>
+      <li>
+        Start at <a href={`${base}modules/`}>the modules index</a>. It has the full arc, in order,
+        with what each one is about - the module pages themselves are still being built (see
+        Current status, below).
+      </li>
+      <li>
+        Work through the ten modules in order. Module 01 is a hard prerequisite for everything
+        after it - nothing past it assumes you already know how to open a terminal.
+      </li>
+      <li>
+        No module completes by reading it. Every module states a required gate, checked two ways.
+        If a module ever reduces to "read this, then move on," or a link here is broken, that's a
+        defect: <a href={`${REPO}/issues`}>open an issue</a>.
+      </li>
+    </ol>
+
+    <h2>Current status</h2>
+    <p>
+      All ten modules are skeleton only: a decided question, arc position, gate design, and
+      takeaway shape, but no authored exercise yet. That's real work still ahead, not a formality.
+      Watch the build log below for progress.
+    </p>
+  </div>
+
+  {
+    recentEntries.length > 0 && (
+      <>
+        <h2 class="mt-14 text-xl font-semibold">Recent from the build log</h2>
+        <ul class="mt-6 space-y-4">
+          {recentEntries.map((entry) => (
+            <li>
+              <a href={`${base}build-log/${entry.id}/`} class="entry-card">
+                <p class="entry-title text-lg font-semibold">{entry.data.title}</p>
+                <p class="mt-1 text-sm opacity-80">{entry.data.description}</p>
+              </a>
+            </li>
+          ))}
+        </ul>
+        <p class="mt-6 text-sm opacity-70">
+          See the <a href={`${base}build-log/`} class="underline">full index</a>.
+        </p>
+      </>
+    )
+  }
+</BaseLayout>

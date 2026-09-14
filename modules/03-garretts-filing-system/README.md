@@ -8,9 +8,10 @@ Can I direct Claude Code to read and fix real files, and teach it how this offic
 
 Third module. Prerequisite: [Module 02, Meet the New Hire](../02-meet-the-new-hire/README.md) - the
 ask-watch-check rhythm from that module is what makes directing a real fix here possible. Next:
-[Module 04, Let It Run](../04-let-it-run/README.md); the hinge is that this module's personal
-`CLAUDE.md` is a hard prerequisite for the rest of the arc, since it's the pack's spine every later
-module builds on. See [`modules/README.md`](../README.md) for the full arc.
+[Module 04, Let It Run](../04-let-it-run/README.md), which requires this module directly; most of
+the rest of the arc (06, 09) also requires this module, though Module 05 only requires Module 02 -
+this module's personal `CLAUDE.md` is the pack's spine most, but not all, later modules build on.
+See [`modules/README.md`](../README.md) for the full arc.
 
 ## Learning objectives (placeholder - finalized when content is authored)
 
@@ -27,10 +28,12 @@ Emmett's correction memo against the predecessor's staff phone list - see
 
 ## Required gate (placeholder - shape decided now, real checker written later)
 
-- **Required checklist (primary):** a checker script confirms a corrected file has all planted
-  wrong values replaced with the correction memo's exact values, with no collateral edits elsewhere
-  in the file, and that a `CLAUDE.md` exists containing most of a small set of required section
-  headers.
+- **Required checklist (primary):** a checker script confirms `03-files/staff-list-corrected.txt`
+  has each of the 4 planted wrong values (a closed set, drawn from the correction memo) replaced
+  with that memo's exact corrected value, with no collateral edits elsewhere
+  in the file, and that `wade-in-workshop/CLAUDE.md` exists containing at least 3 of the 4 exact
+  required section headers (`## About this folder`, `## House rules`, `## How I like output`,
+  `## Never touch`).
 - **Short write-up:** none - this module's conceptual check is whether the CLAUDE.md house rules
   are specific and actionable, graded directly against the artifact itself rather than a separate
   write-up.

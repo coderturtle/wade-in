@@ -37,3 +37,6 @@ dist/
 build/
 *.bak.*
 .project-setup/
+# Astro's generated content-collection cache (site/.astro/): regenerated on every
+# build/dev/check, not source. Matches every prior workshop site's convention.
+.astro/

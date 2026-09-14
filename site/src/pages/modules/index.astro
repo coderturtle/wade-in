@@ -1,0 +1,39 @@
+---
+import { getCollection, render } from "astro:content";
+import BaseLayout from "../../components/layout/BaseLayout.astro";
+
+const rawEntries = (await getCollection("modules")).sort((a, b) => a.id.localeCompare(b.id));
+
+// Read each entry's own first heading for its title, the same source of
+// truth the detail page uses - do not reconstruct a title from the
+// directory slug (copilot-fluent's own cross-model review caught this exact
+// bug: slug reconstruction drops punctuation and apostrophes, e.g.
+// "Garrett's Filing System" would become "garretts filing system").
+const entries = await Promise.all(
+  rawEntries.map(async (entry) => {
+    const { headings } = await render(entry);
+    const title = headings.find((h) => h.depth === 1)?.text ?? entry.id;
+    return { id: entry.id, title };
+  }),
+);
+
+const base = import.meta.env.BASE_URL;
+---
+
+<BaseLayout title="Modules" description="The full Wade In module arc.">
+  <h1 class="text-3xl font-bold">Modules</h1>
+  <p class="mt-4 opacity-80">
+    Ten modules, in order. Module 01 is a hard prerequisite for everything after it.
+  </p>
+  <ul class="mt-6 space-y-4">
+    {
+      entries.map((entry) => (
+        <li>
+          <a href={`${base}modules/${entry.id}/`} class="entry-card">
+            <p class="entry-title text-xl font-semibold">{entry.title}</p>
+          </a>
+        </li>
+      ))
+    }
+  </ul>
+</BaseLayout>

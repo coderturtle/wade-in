@@ -2,7 +2,7 @@
 
 Wade In's arc takes a learner who has never opened a terminal through ten modules inside one continuing scenario: **The Double Deuce**, a fictional live-music venue whose newly hired Operations Coordinator (you) inherits years of chaotic files from a recently retired predecessor. Work through the modules in order - Module 01 is a hard prerequisite for everything after it, since nothing past it assumes you already know how to open a terminal or run a command.
 
-**Hands-on by design, not passive text.** No module here completes by reading it. Every module states a required gate before content exists: an artifact you produce, checked two ways. Every gate also has a stated **takeaway**: you keep something reusable, not just proof you did the exercise.
+**Hands-on by design, not passive text.** No module here completes by reading it. Every module states a required gate before content exists: an artifact you produce, checked two ways. Every module also has a stated **takeaway**: something reusable you're meant to keep, not just proof you did the exercise. Named honestly: most modules' checked artifact and its takeaway are currently two separate things (the checked work is one file, the reusable pack piece is another) rather than the gate directly producing the takeaway - closing that gap for real is still an open design decision, not solved yet.
 
 > **Content status: skeleton only.** All ten modules below have a decided question, arc position, gate shape, and takeaway shape - that is what this page and each module's own README describe. None has an authored exercise, fixture, or checker script yet. That's the next phase, run one module at a time. See `docs/next-actions.md` for what happens next, and `docs/workshop-design.md` §14 for the open design questions that shape how content authoring starts (particularly the Module 01→02 login-step gap, which needs resolving before Module 02's real content gets written).
 
@@ -10,10 +10,12 @@ Wade In's arc takes a learner who has never opened a terminal through ten module
 
 Two checks, every module:
 
-| Tier | What it is |
+| Tier | What it is (once each module's real exercise is written) |
 |---|---|
-| **Required checklist** | A short script, included in the workshop folder, that checks your work against a set of facts: a file that exists, a number that's correct, a set of names that matches. You run it yourself, or ask Claude Code to run it, and it tells you plainly whether you passed. |
+| **Required checklist** | A short script, planned to ship inside the workshop folder, that will check your work against a set of facts: a file that exists, a number that's correct, a set of names that matches. You'll run it yourself, or ask Claude Code to run it, and it will tell you plainly whether you passed. |
 | **A quick write-up, graded for you** | A short answer in your own words about what you did or why, checked by an AI pass against a supplied standard. This part is about judgment calls a script can't make on its own. |
+
+None of this exists yet for any module - see the status note above.
 
 Full design, including exactly what each check can and can't prove: [`docs/workshop-design.md`](../docs/workshop-design.md) §8.
 
@@ -40,7 +42,7 @@ Full per-module gate design and coverage check: [`docs/workshop-design.md`](../d
 
 ## What you keep
 
-Each module's gate produces a takeaway: a piece of your own personal `CLAUDE.md` and recipe pack, assembled module by module.
+Each module is meant to leave you with a takeaway: a piece of your own personal `CLAUDE.md` and recipe pack, assembled module by module (see the note above on where this isn't fully gate-enforced yet).
 
 | # | Module | Takeaway |
 |---|---|---|
@@ -57,4 +59,4 @@ Each module's gate produces a takeaway: a piece of your own personal `CLAUDE.md`
 
 ## A note on the scenario
 
-The Double Deuce is a fictional venue. Every exercise, fixture, and example output in this workshop is simulated - no real client data, no real vendor relationships, ever.
+The Double Deuce is a fictional venue. Every module's starting business data (client records, bookings, financial figures) is simulated - no real client data, no real vendor relationships, ever. Two modules are named, deliberate exceptions that reach outside that fictional data: Module 05 asks you to research real, public vendor websites, and Module 09 asks you to (optionally) work with a few of your own real files.

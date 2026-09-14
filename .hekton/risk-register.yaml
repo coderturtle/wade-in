@@ -103,3 +103,16 @@ risks:
     links:
       - "docs/decisions.md"
       - "docs/next-actions.md"
+  - id: RISK-0009
+    title: "Shared astro dependency pin has known vulnerabilities"
+    category: tooling
+    likelihood: medium
+    impact: medium
+    status: open
+    owner: coderturtle
+    mitigation: "Not force-upgraded unilaterally (breaking major-version bump). Same cross-workshop dependency decision heartbeat/copilot-fluent already flagged rather than fixed per-repo."
+    raised_date: 2026-09-14
+    reviewed_date: 2026-09-14
+    links:
+      - "docs/risks.md"
+      - "docs/next-actions.md"

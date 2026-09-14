@@ -1,11 +1,27 @@
 #!/usr/bin/env bash
 # check-brand-lint.sh: Detect brand/style violations (em dashes, banned phrases,
 # maintainer-vocabulary leaks) in published workshop content. Read-only.
-# Adapted directly from object-lesson's and copilot-fluent's scripts/check-brand-lint.sh.
+# Adapted from copilot-fluent's scripts/check-brand-lint.sh (its multiline-
+# join scan and allowlist marker, both real hardening this script's first
+# draft lacked -- found by an adversarial cross-model review pass and fixed
+# here rather than left as an inherited regression).
 #
 # Scope: published content only, per docs/brand.md's own boundary. Design/
 # planning docs under docs/ (including docs/brand.md itself) are working
 # documents and are explicitly exempt.
+#
+# Allowlist: a line containing the literal marker `brand-lint-ignore` is
+# skipped by the banned-phrase AND em-dash scans, for that whole line. This
+# exists because docs/brand.md's own hard rules state a rule by naming the
+# phrase it prohibits -- without an escape hatch, published content that ever
+# needs to explain a rule by naming the exact phrase would trip this same
+# lint. Use sparingly, only for that exact situation.
+#
+# Named limit, not a security boundary: this is a whole-line bypass with no
+# scoping beyond "the line contains this marker" -- a line using the marker
+# to excuse an unrelated violation elsewhere on the same line would also
+# pass. This tool trusts whoever adds the marker to use it honestly; it does
+# not and cannot verify that.
 #
 # Usage:
 #   scripts/check-brand-lint.sh           # human report
@@ -47,11 +63,27 @@ echo "-- Brand lint (published content only) ----------------------------------"
 echo "  files checked: ${#SCOPE_FILES[@]}"
 echo ""
 
+# Strip any line containing the allowlist marker, then join lines WITHIN a
+# paragraph (a lone newline, not part of a blank-line break) into spaces
+# before matching -- preserving actual paragraph breaks as hard boundaries.
+# The join exists because source wrapping (a multi-word phrase split across
+# two lines) would otherwise evade a strictly per-line grep even though a
+# browser renders the wrapped text as one continuous phrase. Only joining
+# lone newlines, not every newline, avoids a second failure mode: two
+# unrelated sentences either side of a paragraph break concatenating into an
+# accidental match.
+scan_files_excluding_allowlisted_lines() {
+  local pattern="$1"; shift
+  for f in "$@"; do
+    grep -v 'brand-lint-ignore' "$f" 2>/dev/null | perl -0777 -pe 's/(?<!\n)\n(?!\n)/ /g' | tr -s ' ' | grep -qiF "$pattern" && echo "$f"
+  done
+}
+
 if [[ "${#SCOPE_FILES[@]}" -eq 0 ]]; then
   ok "no published-content files found yet"
 else
   # Hard rule: no em dash characters (docs/brand.md).
-  EM_HITS=$(grep -lF '—' "${SCOPE_FILES[@]}" 2>/dev/null || true)
+  EM_HITS=$(scan_files_excluding_allowlisted_lines '—' "${SCOPE_FILES[@]}")
   if [[ -n "$EM_HITS" ]]; then
     warn "em dash found in: $(echo "$EM_HITS" | tr '\n' ' ')"
   else
@@ -64,29 +96,51 @@ else
     "delve" "tapestry" "unlock" "seamless" "game-changing" "revolutioniz"
     "transform your workflow" "supercharge" "effortlessly" "cutting-edge"
     "thought leader" "in today's fast-paced world" "it's important to note"
-    "master the art of" "in this comprehensive guide" "10x your skills"
-    "trick the checker" "beat the checker" "get past the prompt"
+    "at scale" "master the art of" "in this comprehensive guide"
+    "10x your skills" "trick the checker" "beat the checker"
+    "get past the prompt" "the terminal is scary"
   )
   for phrase in "${BANNED[@]}"; do
-    HITS=$(grep -liF "$phrase" "${SCOPE_FILES[@]}" 2>/dev/null || true)
+    HITS=$(scan_files_excluding_allowlisted_lines "$phrase" "${SCOPE_FILES[@]}")
     if [[ -n "$HITS" ]]; then
       warn "banned phrase \"$phrase\" found in: $(echo "$HITS" | tr '\n' ' ')"
     fi
   done
 
   # Workshop-specific: maintainer/process vocabulary must never leak into
-  # published content (docs/brand.md's hard rule, the single most convergent
-  # finding from this workshop's own Review Panel -- 4 of 7 personas).
+  # LEARNER-FACING content (docs/brand.md's hard rule, the single most
+  # convergent finding from this workshop's own Review Panel -- 4 of 7
+  # personas). Scoped narrower than the full SCOPE_FILES above, on purpose:
+  # docs/build-log/ is the maintainer's own build-in-public journal (first
+  # person, can and does reference this factory's real tooling by name --
+  # matches copilot-fluent's own build-log precedent) and is deliberately
+  # exempt here, same as it's exempt from every prior workshop's equivalent
+  # rule. README.md and modules/*.md are the actual learner-facing front
+  # door and module content, so those stay in scope.
+  LEARNER_FACING_FILES=()
+  [[ -f README.md ]] && LEARNER_FACING_FILES+=("README.md")
+  while IFS= read -r -d '' f; do LEARNER_FACING_FILES+=("$f"); done < <(find modules -name '*.md' -print0 2>/dev/null)
+  while IFS= read -r -d '' f; do LEARNER_FACING_FILES+=("$f"); done < <(find site/src -type f \( -name '*.astro' -o -name '*.mdx' \) -print0 2>/dev/null)
+
+  # Kept deliberately narrower than a first draft of docs/brand.md's own
+  # prose list: "checker" and "the arc" were originally named there too, but
+  # an adversarial review pass caught the mismatch (they weren't in this
+  # script's list) and, on reflection, they're plain English a first-time
+  # reader can parse from context -- unlike the terms below, which are real,
+  # opaque internal-factory jargon. docs/brand.md was corrected to match this
+  # script's actual, narrower scope rather than the other way around.
   MAINTAINER_TERMS=(
     "Tier 1" "Tier 2" "Coachgremlin" "self-attested" "grading key"
     "Design Principle" "Mock Learner Gremlin" "Workshop Gremlin"
   )
-  for term in "${MAINTAINER_TERMS[@]}"; do
-    HITS=$(grep -liF "$term" "${SCOPE_FILES[@]}" 2>/dev/null || true)
-    if [[ -n "$HITS" ]]; then
-      warn "maintainer-facing term \"$term\" leaked into published content: $(echo "$HITS" | tr '\n' ' ')"
-    fi
-  done
+  if [[ "${#LEARNER_FACING_FILES[@]}" -gt 0 ]]; then
+    for term in "${MAINTAINER_TERMS[@]}"; do
+      HITS=$(scan_files_excluding_allowlisted_lines "$term" "${LEARNER_FACING_FILES[@]}")
+      if [[ -n "$HITS" ]]; then
+        warn "maintainer-facing term \"$term\" leaked into learner-facing content: $(echo "$HITS" | tr '\n' ' ')"
+      fi
+    done
+  fi
 
   [[ "$VIOLATIONS" -eq 0 ]] && ok "no banned phrases or maintainer-vocabulary leaks in published content"
 fi

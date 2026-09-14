@@ -1,0 +1,49 @@
+---
+import "../../styles/global.css";
+
+interface Props {
+  title: string;
+  description?: string;
+}
+
+const {
+  title,
+  description = "Wade In: open a real terminal for the first time, and leave able to get real work done with Claude Code.",
+} = Astro.props;
+
+const base = import.meta.env.BASE_URL;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" type="image/svg+xml" href={`${base}favicon.svg`} />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <slot name="head" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="prose-narrative flex items-center justify-between px-4 py-6">
+        <a href={base} class="brand-mark font-mono text-sm uppercase tracking-widest no-underline">
+          Wade In
+        </a>
+        <nav class="site-nav flex gap-5 text-sm">
+          <a href={base}>Guide</a>
+          <a href={`${base}modules/`}>Modules</a>
+          <a href={`${base}build-log/`}>Build log</a>
+        </nav>
+      </div>
+    </header>
+    <main class="prose-narrative px-4 pb-16">
+      <slot />
+    </main>
+    <footer class="prose-narrative px-4 py-8 text-sm opacity-70">
+      <p>
+        The full repo lives on <a href="https://github.com/coderturtle/wade-in" class="underline">GitHub</a>. This site is the guide, the module reader, and the build-in-public journal.
+      </p>
+    </footer>
+  </body>
+</html>
