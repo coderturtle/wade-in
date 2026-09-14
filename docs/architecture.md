@@ -1,4 +1,4 @@
-# Architecture: Claude Code for the Non-Engineer
+# Architecture: Wade In
 
 ## Overview
 

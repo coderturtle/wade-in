@@ -1,4 +1,4 @@
-# Risks: Claude Code for the Non-Engineer
+# Risks: Wade In
 
 ## Risk Register
 

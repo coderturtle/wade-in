@@ -1,4 +1,4 @@
-# Next Actions: Claude Code for the Non-Engineer
+# Next Actions: Wade In
 
 ## Immediate
 
