@@ -5,15 +5,20 @@
 - [x] Define project brief — see `.hekton/project.yaml` idea field
 - [x] Record first design decisions in `docs/decisions.md` — naming pass + full interview-confirmed scope now logged
 - [x] Draft, adversarially critique, and reconcile `docs/workshop-design.md` (three-agent chain) — done 2026-09-14
+- [x] Run the Workshop Review Panel (7-persona pass) against the reconciled `docs/workshop-design.md` — done 2026-09-14, findings folded into the design doc's §14 (Open design questions) and §15 (Revision Log) rather than a separate report file
 
 ## This Week
 
-- [ ] Run the Workshop Review Panel (7-persona pass) against the reconciled `docs/workshop-design.md`
-- [ ] Resolve the platform decision (macOS/Linux-first vs. dual-track vs. Windows-first) — currently the single largest unresolved design risk, per `docs/workshop-design.md` §11
-- [ ] Design Module 01's authenticated-session check (`docs/workshop-design.md` §11's named gap — the checker currently only confirms `claude` resolves on PATH, not that login/auth succeeded)
-- [ ] Decide install-step placement: end of Module 01 vs. a separate setup interlude (`docs/workshop-design.md` §7 row 01/§11)
-- [ ] Decide whether the sandbox-safety `CLAUDE.md` and the learner's editable pack `CLAUDE.md` (Module 03) are the same file or two separate files (`docs/workshop-design.md` §8/§18)
-- [ ] Decide Tier 2's completion contract: required-to-advance status, submission convention, model policy, disagreement/retry path (`docs/workshop-design.md` §7's named Design Principle 4/Tier-2 gaps)
+Design doc §14 items, in its own priority order:
+
+- [ ] **Blocking for content authoring:** close the Module 01→02 authenticated-session gap — highest-confidence finding across both review passes (3 Review Panel personas + Codex). See `docs/workshop-design.md` §14 item 1, §11.
+- [ ] Resolve the platform decision (macOS/Linux-first vs. dual-track vs. Windows-first) — the single largest unresolved design risk. §14 item 2, §11.
+- [ ] Pin Tier 2's completion contract: required-to-advance status, submission convention, model policy, disagreement/retry path — cheap now, expensive to retrofit across ten checkers. §14 item 3.
+- [ ] Decide whether each module's checker should also gate that module's own `my-pack/` contribution (the Design Principle 4 gap). §14 item 4.
+- [ ] Decide whether the safety-instructing `CLAUDE.md` and Module 03's learner-editable `CLAUDE.md` are the same file or two. §14 item 5.
+- [ ] Decide install-step placement: end of Module 01 vs. a separate setup interlude. §14 item 6.
+- [ ] Decide whether the sandbox should also be enforced via Claude Code's own permission-mode/allowed-directory settings, not instruction alone. §14 item 7.
+- [ ] Decide whether a permission-habituation counter-exercise should land earlier than Module 09. §14 item 8.
 - [ ] Build Deliverables & branding: module skeleton, brand layer, `docs/brand.md`, `docs/maintainers.md`, `docs/risks.md`
 - [ ] Build the site skeleton (Astro, vocabulary-leak-safe placeholder for skeleton-only modules per the non-engineering variant's standing safeguard) — no deploy yet
 
