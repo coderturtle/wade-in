@@ -30,10 +30,13 @@ privacy adaptation: a learner may use provided stand-in files instead of their o
 
 ## Required gate (placeholder - shape decided now, real checker written later)
 
-- **Required checklist (primary):** a checker script confirms a backup exists whose filenames and
-  per-file checksums match the originals recorded at backup time, confirms before/after file-listing
-  manifests exist with checker-written timestamps proving order, and confirms a closed-set safety
-  quiz (given several described requests, pick the safe ones) matches a published key that follows
+- **Required checklist (primary):** the learner creates one real folder outside the workshop
+  directory and copies a few real files (or stand-ins) into it, then runs the taught ritual. A
+  checker script confirms a `backup/` exists whose filenames and
+  per-file checksums match the originals recorded at backup time; confirms `before-manifest.txt`
+  and `after-manifest.txt` both exist, are non-empty, and each carry a checker-written timestamp
+  proving order; and confirms a closed-set safety
+  quiz (6 described situations, select the 3 safe ones) matches a published key that follows
   from a rule the module explicitly teaches. The checker derives checksums from real files to verify
   backup integrity but never displays, extracts, or transmits their contents.
 - **Short write-up (secondary):** the learner's own safety plan - what they'd never point Claude

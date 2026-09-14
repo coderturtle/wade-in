@@ -21,27 +21,30 @@ command yourself. See [`modules/README.md`](../README.md) for the full arc.
 
 ## Exercise material to draw from (not a spec - authored during the content-building pass)
 
-None decided yet - this is the one module in the arc without an existing curriculum anchor to draw
-from, since no prior Hekton workshop has had to teach the terminal itself before its subject could
-start. Candidate sources for content-authoring time: general terminal-basics teaching material
+None decided yet - this module doesn't yet have an existing curriculum anchor to draw from within
+this factory's own prior workshops. Candidate sources for content-authoring time: general terminal-basics teaching material
 aimed at complete beginners, adapted rather than copied, kept tightly scoped to only what Module 02
 onward actually needs.
 
 ## Required gate (placeholder - shape decided now, real checker written later)
 
-- **Required checklist (primary):** a checker script the learner runs themselves confirms - the
-  workshop folder is unpacked with its marker file intact; a new `01-terminal/my-notes/` directory
-  exists; a supplied welcome note is copied into it byte-identical; the `claude` CLI resolves on
-  PATH. **Open design question, not yet resolved:** whether this module's checker should also
+- **Required checklist (primary):** `check.sh 01`, run by the learner themselves, confirms - the
+  workshop folder is unpacked with its marker file intact (exact path checked); a new
+  `01-terminal/my-notes/` directory exists; the supplied `fixtures/welcome-note.txt` is copied into
+  it byte-identical (checksum compare); the `claude` CLI resolves on PATH via the checker's own
+  `command -v` probe; a `RESULT: PASS (n/n)` line prints with the full count. **Open design
+  question, not yet resolved:** whether this module's checker should also
   confirm the learner has actually authenticated/logged in, not just installed the CLI - see
   `docs/workshop-design.md` §14 item 1, the single highest-priority open question in the whole
-  design, before this module's real content gets written.
-- **Short write-up (secondary):** three short own-words answers - what a prompt is, what a current
+  design - the fix (if any) would likely land in this module's own checker, but the design doc
+  names it as blocking specifically for Module 02's content, not this one.
+- **Short write-up (secondary), presence-checked at the required-checklist tier:** three short
+  own-words answers in a provided answers file - what a prompt is, what a current
   directory is, what to do if the terminal "looks stuck."
 
 ## Takeaway
 
-A terminal survival card started in the learner's own reusable pack: open, navigate, recover.
+`my-pack/cheatsheet.md` started: the learner's own terminal survival card (open, navigate, recover).
 
 ## Stop condition (placeholder)
 
@@ -53,4 +56,5 @@ The checker script passes with the full count, and all three own-words answers a
 > shape. It has no authored exercise, fixture, or checker script yet - that's the next phase, run
 > one module at a time. See [`modules/README.md`](../README.md) for workshop-wide status, and
 > `docs/workshop-design.md` §14 item 1 for the specific open question that should be resolved
-> before this module's real content is written.
+> before Module 02's real content is written (this module's own checker is likely where the fix
+> lands, even though the design doc names Module 02 as what it blocks).

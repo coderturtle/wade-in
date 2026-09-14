@@ -25,10 +25,10 @@ Carl Bruner's month-end request, drafted from Doc Clay's raw weekly numbers file
 
 ## Required gate (placeholder - shape decided now, real checker written later)
 
-- **Required checklist (primary):** a checker script recomputes the expected top-line figure
-  independently from the source fixture, confirms it appears in the document along with several
-  other exact figures, confirms all required section headers are present verbatim, and checks the
-  document is within a stated word-count range.
+- **Required checklist (primary):** a checker script confirms `06-docs/monthly-summary.md` contains
+  the exact top-line revenue figure, recomputed by the checker as the sum of the fixture's four
+  weekly figures, plus 3 further exact figures read from the fixture, plus all 5 required section
+  headers present verbatim (a closed set), plus a word count within a stated bound.
 - **Short write-up (secondary):** does the document read as a summary for its intended reader,
   rather than a data dump, and did the learner verify the figures themselves.
 

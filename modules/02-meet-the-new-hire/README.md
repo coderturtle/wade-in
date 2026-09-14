@@ -26,10 +26,11 @@ Doc Clay's request to summarize the venue's history document from the predecesso
 
 ## Required gate (placeholder - shape decided now, real checker written later)
 
-- **Required checklist (primary):** a checker script confirms a summary file exists, is a short,
-  bounded length, and contains two specific facts the checker itself reads from the source fixture
-  (not an embedded answer key). This check establishes the file has the right properties; it can't
-  establish that Claude Code, rather than the learner typing by hand, actually produced it - a
+- **Required checklist (primary):** a checker script confirms `02-meet/summary.txt` exists, is
+  3-5 lines (count), and contains the venue's founding year and current capacity figure - two
+  specific facts the checker itself reads from the source fixture (not an embedded answer key).
+  This check establishes the file has the right properties; it can't establish that Claude Code,
+  rather than the learner typing by hand, actually produced it - a
   named limit of this kind of check, not something this module's gate claims to solve.
 - **Short write-up (secondary):** own-words answers on what a permission prompt is, why Claude Code
   asks before acting, and one thing the learner checked themselves before trusting the summary.

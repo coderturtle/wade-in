@@ -29,9 +29,13 @@ packet with new figures not derivable from any prior module's fixtures. See
 
 - **Required checklist (primary):** a cross-artifact checker drawing one mechanism from each of
   Modules 04, 06, 07, and 08, every one bound to the new capstone packet's own data, plus a
-  Module-05-style structural check on the research brief, plus a pack-completeness check (the
-  personal `CLAUDE.md`, at least six prompt recipes, the cheatsheet, the mini-script recipes from
-  Module 08, and the safety-ritual checklist from Module 09 are all present).
+  Module-05-style structural check on the research brief, plus a pack-completeness check: the
+  personal `CLAUDE.md` with its required headers, at least 6 prompt recipes each carrying the exact
+  `## When to use` header (a count), the cheatsheet, the mini-script recipes from
+  Module 08, and the safety-ritual checklist from Module 09 - plus a short prompt asking the learner
+  to re-read Module 09's ritual against this capstone's own real-file question before finishing, so
+  the pack-completeness check touches the safety discipline even though this module's own graded
+  artifacts stay sandboxed.
 - **Short write-up (secondary):** does the assembled package read as something the learner will
   actually use next month, and does the work show genuine re-engagement with this module's own new
   facts rather than resubmitted prior work - named honestly as a gap no automated check can fully
@@ -44,8 +48,9 @@ ritual - the literal artifact of "fluent."
 
 ## Stop condition (placeholder)
 
-The checker script passes with the full count, and the write-up shows genuine engagement with the
-capstone's own new facts.
+The checker script passes with the full count, and the write-up reads as genuine engagement with
+the capstone's own new facts - the same named limit as the gate above applies here too: this is
+what the check can establish, not proof that it's true.
 
 ---
 

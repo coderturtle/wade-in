@@ -1,0 +1,91 @@
+name: Deploy site to GitHub Pages
+
+# Human Gate (per docs/next-actions.md and the Workshop Gremlin's own policy):
+# first Pages deploy is a human-confirmed action, not automatic. This workflow is
+# defined but NOT wired to run on push yet - only workflow_dispatch, so merging
+# this scaffold to main cannot itself trigger a live deploy. Once a human enables
+# GitHub Pages in repo settings and runs workflow_dispatch once to confirm the
+# site is ready to be public, add a `push: branches: [main]` trigger scoped to
+# site/**, docs/build-log/**, modules/**, and this file.
+#
+# Custom-domain scaffolding (wade-in.coderturtle.io, agentic-infra-lab's
+# github-pages-dns pattern, matching every prior workshop site) landed in this
+# same commit - not the actual cutover, which also needs the repo
+# Settings > Pages domain setting and live DNS, neither done yet. Per
+# docs/workshop-design.md's own status line, deployment/DNS is deliberately
+# deferred until real module content exists.
+#
+# Do NOT rely on site/public/CNAME in the build artifact to set the custom
+# domain for an Actions-based Pages deploy (a lesson copilot-fluent's own
+# workflow comment carries forward, corrected there after cross-model
+# review). The domain must be set via the repo's Settings > Pages UI (or the
+# API). Before running workflow_dispatch for the first time, a human must:
+# (1) enable Pages in repo Settings with source = GitHub Actions -
+# actions/configure-pages defaults enablement to false and can't self-enable
+# with the default GITHUB_TOKEN; (2) set the custom domain in that same
+# settings page; (3) confirm DNS for wade-in.coderturtle.io actually
+# resolves. None of DNS/domain/enablement blocks the build step itself, only
+# whether the deployed site is reachable at the custom hostname afterward.
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: site/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: site
+
+      # Blocking, unlike the local pre-push hook's warn-only check (setup-
+      # hooks.sh) - a bad deploy is worse than a local warning ignored.
+      - name: Brand lint (blocking)
+        run: bash scripts/check-brand-lint.sh --check
+
+      - name: Build site
+        run: npm run build
+        working-directory: site
+
+      # Custom domain: wade-in.coderturtle.io, via agentic-infra-lab's
+      # github-pages-dns pattern (Route53 CNAME + TXT verification). Pages
+      # enablement and the custom-domain setting are one-time, human-run
+      # steps in repo Settings > Pages (GITHUB_TOKEN cannot do either) - do
+      # not rely on site/public/CNAME alone for an Actions-based deploy, see
+      # the note above this job.
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
