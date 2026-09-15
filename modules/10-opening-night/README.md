@@ -152,7 +152,7 @@ not just kept. Before you call this module done, make sure `my-pack/` actually h
 - `cheatsheet.md`, your terminal survival card from Modules 01 and 02.
 - `recipe-safe-script-direction.md`, your safe-script-direction recipe from Module 04.
 - `real-folder-ritual.md`, your real-folder ritual notes from Module 09.
-- At least six more real entries from Modules 05 through 08 - your research-prompt template, your
+- At least five more real entries from Modules 05 through 08 - your research-prompt template, your
   document-drafting recipe, your CSV-task recipe, and the batch-rename and mail-merge recipes from
   Module 08, at minimum.
 
@@ -176,7 +176,7 @@ earlier module's), each one using the same mechanism its source module taught - 
 distinct-source citation counting for the research brief, a script-computed total and extremes for
 the crew report, exact-figure matching for the budget write-up, a recomputed merge with the correct
 conflict winner for the guest list, and byte-for-byte renamed photos plus placeholder-free letters
-for the last part - and then the pack itself: the three named files, at least six more real
+for the last part - and then the pack itself: the three named files, at least five more real
 entries, and your workshop folder's `CLAUDE.md` still carrying the headers Module 03 asked you to
 preserve. It prints `RESULT: PASS` with every item checked when everything's there. As always, the
 message next to anything still failing says exactly what's missing.

@@ -1088,7 +1088,7 @@ case "$MODULE" in
       for f in "$EXPECTED_10_CREW"/*; do
         [[ -e "$f" ]] || continue
         BASE_NAME="$(basename "$f")"
-        if [[ "$BASE_NAME" != "crew-report.txt" && "$BASE_NAME" != "answers.txt" && -f "$f" && ! -L "$f" ]]; then
+        if [[ "$BASE_NAME" != "crew-report.txt" && "$BASE_NAME" != "answers.txt" && -f "$f" && ! -L "$f" && -s "$f" ]]; then
           CREW_SCRIPT_FOUND=true
           break
         fi
@@ -1145,36 +1145,36 @@ case "$MODULE" in
     if [[ "$CREW_REPORT_OK" == true && "$CREW_FIXTURES_OK" == true ]]; then
       ACTUAL_CREW_TOTAL="$(read_crew_label 'TOTAL_HOURS:')"
       if [[ "$ACTUAL_CREW_TOTAL" == "$CREW_TOTAL_EXPECTED" ]]; then
-        check "crew-report.txt has the exact total hours ($CREW_TOTAL_EXPECTED)" pass
+        check "crew-report.txt has the exact total hours, recomputed from the 8 fixtures" pass
       else
-        check "crew-report.txt has the exact total hours (expected $CREW_TOTAL_EXPECTED, found '${ACTUAL_CREW_TOTAL:-nothing}')" fail
+        check "crew-report.txt has the exact total hours, recomputed from the 8 fixtures" fail
       fi
     else
-      check "crew-report.txt has the exact total hours (contact the workshop, not your own mistake)" fail
+      check "crew-report.txt has the exact total hours, recomputed from the 8 fixtures (contact the workshop, not your own mistake)" fail
     fi
 
     if [[ "$CREW_REPORT_OK" == true && "$CREW_FIXTURES_OK" == true ]]; then
       ACTUAL_CREW_BEST_DATE="$(read_crew_label 'BUSIEST_DATE:')"
       ACTUAL_CREW_BEST_HOURS="$(read_crew_label 'BUSIEST_HOURS:')"
       if [[ "$ACTUAL_CREW_BEST_DATE" == "$CREW_BEST_DATE" && "$ACTUAL_CREW_BEST_HOURS" == "$CREW_BEST_HOURS" ]]; then
-        check "crew-report.txt has the exact busiest day ($CREW_BEST_DATE, $CREW_BEST_HOURS)" pass
+        check "crew-report.txt has the exact busiest day, recomputed from the 8 fixtures" pass
       else
-        check "crew-report.txt has the exact busiest day (expected $CREW_BEST_DATE / $CREW_BEST_HOURS, found '${ACTUAL_CREW_BEST_DATE:-nothing}' / '${ACTUAL_CREW_BEST_HOURS:-nothing}')" fail
+        check "crew-report.txt has the exact busiest day, recomputed from the 8 fixtures" fail
       fi
     else
-      check "crew-report.txt has the exact busiest day (contact the workshop, not your own mistake)" fail
+      check "crew-report.txt has the exact busiest day, recomputed from the 8 fixtures (contact the workshop, not your own mistake)" fail
     fi
 
     if [[ "$CREW_REPORT_OK" == true && "$CREW_FIXTURES_OK" == true ]]; then
       ACTUAL_CREW_WORST_DATE="$(read_crew_label 'LIGHTEST_DATE:')"
       ACTUAL_CREW_WORST_HOURS="$(read_crew_label 'LIGHTEST_HOURS:')"
       if [[ "$ACTUAL_CREW_WORST_DATE" == "$CREW_WORST_DATE" && "$ACTUAL_CREW_WORST_HOURS" == "$CREW_WORST_HOURS" ]]; then
-        check "crew-report.txt has the exact lightest day ($CREW_WORST_DATE, $CREW_WORST_HOURS)" pass
+        check "crew-report.txt has the exact lightest day, recomputed from the 8 fixtures" pass
       else
-        check "crew-report.txt has the exact lightest day (expected $CREW_WORST_DATE / $CREW_WORST_HOURS, found '${ACTUAL_CREW_WORST_DATE:-nothing}' / '${ACTUAL_CREW_WORST_HOURS:-nothing}')" fail
+        check "crew-report.txt has the exact lightest day, recomputed from the 8 fixtures" fail
       fi
     else
-      check "crew-report.txt has the exact lightest day (contact the workshop, not your own mistake)" fail
+      check "crew-report.txt has the exact lightest day, recomputed from the 8 fixtures (contact the workshop, not your own mistake)" fail
     fi
 
     ANSWERS10_CREW="$ROOT/10-capstone/crew/answers.txt"
@@ -1259,32 +1259,32 @@ case "$MODULE" in
       TICKET_PRICE="$(grep -oE 'Advance ticket price: \$[0-9]+' "$BUDGET_FIXTURE" | grep -oE '[0-9]+$')"
       TOTAL_BUDGET_EXPECTED=$((ENT_FEE + AV_FEE + CATERING_FEE + SECURITY_FEE))
 
-      DOC10_ALL_TOKENS="$(grep -oE '\$?[0-9][0-9,]*' "$BUDGET_DOC" 2>/dev/null | tr -d '$,')"
-      if [[ "$BUDGET_REAL_FILE" == true ]] && echo "$DOC10_ALL_TOKENS" | grep -qxF "$TOTAL_BUDGET_EXPECTED"; then
-        check "opening-night-budget.md includes the exact total budget (\$$TOTAL_BUDGET_EXPECTED)" pass
+      TOTAL_LINE_TOKENS="$(grep -iE 'total' "$BUDGET_DOC" 2>/dev/null | grep -oE '\$?[0-9][0-9,]*' | tr -d '$,')"
+      if [[ "$BUDGET_REAL_FILE" == true ]] && echo "$TOTAL_LINE_TOKENS" | grep -qxF "$TOTAL_BUDGET_EXPECTED"; then
+        check "opening-night-budget.md includes the exact total budget, correctly summed" pass
       else
-        check "opening-night-budget.md includes the exact total budget (\$$TOTAL_BUDGET_EXPECTED)" fail
+        check "opening-night-budget.md includes the exact total budget, correctly summed" fail
       fi
 
       ATTEND_LINE_TOKENS="$(grep -iE 'attend' "$BUDGET_DOC" 2>/dev/null | grep -oE '[0-9][0-9,]*' | tr -d ',')"
       if [[ "$BUDGET_REAL_FILE" == true ]] && echo "$ATTEND_LINE_TOKENS" | grep -qxF "$ATTENDANCE"; then
-        check "opening-night-budget.md includes the expected attendance ($ATTENDANCE)" pass
+        check "opening-night-budget.md includes the expected attendance" pass
       else
-        check "opening-night-budget.md includes the expected attendance ($ATTENDANCE)" fail
+        check "opening-night-budget.md includes the expected attendance" fail
       fi
 
       TICKET_LINE_TOKENS="$(grep -iE 'ticket|price' "$BUDGET_DOC" 2>/dev/null | grep -oE '\$?[0-9][0-9,]*' | tr -d '$,')"
       if [[ "$BUDGET_REAL_FILE" == true ]] && echo "$TICKET_LINE_TOKENS" | grep -qxF "$TICKET_PRICE"; then
-        check "opening-night-budget.md includes the advance ticket price (\$$TICKET_PRICE)" pass
+        check "opening-night-budget.md includes the advance ticket price" pass
       else
-        check "opening-night-budget.md includes the advance ticket price (\$$TICKET_PRICE)" fail
+        check "opening-night-budget.md includes the advance ticket price" fail
       fi
 
       ENT_LINE_TOKENS="$(grep -iE 'entertainment' "$BUDGET_DOC" 2>/dev/null | grep -oE '\$?[0-9][0-9,]*' | tr -d '$,')"
       if [[ "$BUDGET_REAL_FILE" == true ]] && echo "$ENT_LINE_TOKENS" | grep -qxF "$ENT_FEE"; then
-        check "opening-night-budget.md includes the entertainment fee (\$$ENT_FEE)" pass
+        check "opening-night-budget.md includes the entertainment fee" pass
       else
-        check "opening-night-budget.md includes the entertainment fee (\$$ENT_FEE)" fail
+        check "opening-night-budget.md includes the entertainment fee" fail
       fi
     fi
 
@@ -1503,6 +1503,10 @@ case "$MODULE" in
         if [[ ! -f "$OUT_PATH" ]]; then
           PRESS_RENAME_OK=false; continue
         fi
+        OUT_LINK_COUNT="$(stat -f '%l' "$OUT_PATH" 2>/dev/null || stat -c '%h' "$OUT_PATH" 2>/dev/null || echo "1")"
+        if [[ "$OUT_LINK_COUNT" != "1" ]]; then
+          PRESS_RENAME_OK=false; continue
+        fi
         OUT_SUM="$(file_checksum "$OUT_PATH" 2>/dev/null || echo "")"
         ORIG_SUM="$(file_checksum "$ORIG_PATH" 2>/dev/null || echo "")"
         if [[ -n "$OUT_SUM" && "$OUT_SUM" == "$ORIG_SUM" ]]; then
@@ -1600,6 +1604,34 @@ case "$MODULE" in
       check "all 5 VIP letters contain their row's exact name, event date, and party size from the CSV (matched $VIP_ROW_MATCHED/5)" fail
     fi
 
+    VIP_ALL_NAMES=()
+    if [[ "$VIP_CSV_OK" == true ]]; then
+      FIRST_LINE=true
+      while IFS=',' read -r v_name v_date v_party; do
+        if [[ "$FIRST_LINE" == true ]]; then FIRST_LINE=false; continue; fi
+        v_name="$(trim_field "$v_name")"
+        [[ -z "$v_name" ]] && continue
+        VIP_ALL_NAMES+=("$v_name")
+      done < "$VIP_CSV"
+    fi
+    VIP_EXCLUSIVE_OK=true
+    if [[ "${#VIP_LETTER_FILES[@]}" -eq 0 || "${#VIP_ALL_NAMES[@]}" -eq 0 ]]; then
+      VIP_EXCLUSIVE_OK=false
+    else
+      for CANDIDATE in "${VIP_LETTER_FILES[@]}"; do
+        NAME_HITS=0
+        for nm in "${VIP_ALL_NAMES[@]}"; do
+          grep -qF "$nm" "$CANDIDATE" 2>/dev/null && NAME_HITS=$((NAME_HITS + 1))
+        done
+        [[ "$NAME_HITS" -ne 1 ]] && VIP_EXCLUSIVE_OK=false
+      done
+    fi
+    if [[ "$VIP_EXCLUSIVE_OK" == true ]]; then
+      check "each VIP letter is personalized to exactly one guest, not a shared roster of all five" pass
+    else
+      check "each VIP letter is personalized to exactly one guest, not a shared roster of all five" fail
+    fi
+
     VIP_PLACEHOLDER_COUNT=0
     if [[ "${#VIP_LETTER_FILES[@]}" -gt 0 ]]; then
       for CANDIDATE in "${VIP_LETTER_FILES[@]}"; do
@@ -1682,10 +1714,10 @@ case "$MODULE" in
         fi
       done < <(find "$MY_PACK_DIR" -mindepth 1 -not -name '.*' -print0 2>/dev/null)
     fi
-    if [[ "$MY_PACK_EXTRA_COUNT" -ge 6 ]]; then
-      check "my-pack/ has real entries from Modules 05-08 too (found $MY_PACK_EXTRA_COUNT beyond the three named files, need at least 6)" pass
+    if [[ "$MY_PACK_EXTRA_COUNT" -ge 5 ]]; then
+      check "my-pack/ has real entries from Modules 05-08 too (found $MY_PACK_EXTRA_COUNT beyond the three named files, need at least 5)" pass
     else
-      check "my-pack/ has real entries from Modules 05-08 too (found $MY_PACK_EXTRA_COUNT beyond the three named files, need at least 6)" fail
+      check "my-pack/ has real entries from Modules 05-08 too (found $MY_PACK_EXTRA_COUNT beyond the three named files, need at least 5)" fail
     fi
 
     # === Tier 2: own-words capstone reflection ===
