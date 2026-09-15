@@ -553,7 +553,13 @@ case "$MODULE" in
     if [[ "$PHOTOS_OUT_OK" == false ]]; then
       check "08-auto/photos/ contains exactly the 25 expected files, no extras (08-auto/photos/ is a symlink, not a real directory)" fail
     else
-      ACTUAL_PHOTO_COUNT="$(find "$EXPECTED_PHOTOS_OUT" -mindepth 1 -maxdepth 1 2>/dev/null | wc -l | tr -d ' ')"
+      # Excludes dotfiles (-not -name '.*') -- found by a fresh-context
+      # adversarial pass: the module's own text tells the learner to open
+      # this folder in Finder to spot-check a few files, and Finder
+      # routinely writes a .DS_Store into any local folder it displays,
+      # which would otherwise inflate this count to 26 with no diagnostic
+      # telling a first-time terminal user what happened or how to fix it.
+      ACTUAL_PHOTO_COUNT="$(find "$EXPECTED_PHOTOS_OUT" -mindepth 1 -maxdepth 1 -not -name '.*' 2>/dev/null | wc -l | tr -d ' ')"
       if [[ "$ACTUAL_PHOTO_COUNT" -eq 25 ]]; then
         check "08-auto/photos/ contains exactly the 25 expected files, no extras" pass
       else
@@ -592,7 +598,9 @@ case "$MODULE" in
     LETTER_FILES=()
     LETTERS_TOTAL_ENTRIES=0
     if [[ "$LETTERS_OUT_OK" == true ]]; then
-      LETTERS_TOTAL_ENTRIES="$(find "$EXPECTED_LETTERS_OUT" -mindepth 1 -maxdepth 1 2>/dev/null | wc -l | tr -d ' ')"
+      # Same dotfile exclusion as the photos count above (.DS_Store from
+      # Finder spot-checking).
+      LETTERS_TOTAL_ENTRIES="$(find "$EXPECTED_LETTERS_OUT" -mindepth 1 -maxdepth 1 -not -name '.*' 2>/dev/null | wc -l | tr -d ' ')"
       while IFS= read -r -d '' entry; do
         if [[ -L "$entry" ]]; then
           continue
@@ -603,7 +611,7 @@ case "$MODULE" in
             LETTER_FILES+=("$entry")
           fi
         fi
-      done < <(find "$EXPECTED_LETTERS_OUT" -mindepth 1 -maxdepth 1 -print0 2>/dev/null)
+      done < <(find "$EXPECTED_LETTERS_OUT" -mindepth 1 -maxdepth 1 -not -name '.*' -print0 2>/dev/null)
     fi
 
     # 7. Exactly 6 real, usable letter files -- no extras, no symlinks or
@@ -672,15 +680,24 @@ case "$MODULE" in
     elif [[ "${#LETTER_FILES[@]}" -eq 0 ]]; then
       check "zero unfilled template placeholders across the letters (no letter files found to check)" fail
     else
+      # Counts any lone `{` character, not just literal `{{` -- found by a
+      # fresh-context adversarial pass: a broken/near-miss remnant like
+      # "{ {amount} }" (a space between the braces) doesn't contain "{{" at
+      # all and was demonstrated to slip through undetected when a
+      # different, correctly-filled line elsewhere in the same letter
+      # already satisfied the content-match check. The template's own fixed
+      # prose (see the module text) never contains a literal `{` anywhere
+      # once the three placeholders are genuinely filled in, so counting
+      # every `{` is not an overclaim -- a correctly-filled letter has zero.
       PLACEHOLDER_COUNT=0
       for CANDIDATE in "${LETTER_FILES[@]}"; do
-        C="$(grep -o '{{' "$CANDIDATE" 2>/dev/null | wc -l | tr -d ' ')"
+        C="$(grep -o '{' "$CANDIDATE" 2>/dev/null | wc -l | tr -d ' ')"
         PLACEHOLDER_COUNT=$((PLACEHOLDER_COUNT + C))
       done
       if [[ "$PLACEHOLDER_COUNT" -eq 0 ]]; then
-        check "zero unfilled template placeholders across the letters (no literal {{ left)" pass
+        check "zero unfilled template placeholders across the letters (no leftover { anywhere)" pass
       else
-        check "zero unfilled template placeholders across the letters (found $PLACEHOLDER_COUNT occurrences of {{)" fail
+        check "zero unfilled template placeholders across the letters (found $PLACEHOLDER_COUNT leftover { character(s))" fail
       fi
     fi
 
