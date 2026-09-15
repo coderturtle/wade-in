@@ -416,6 +416,185 @@ case "$MODULE" in
       check "02-meet/answers.txt has all three reflection answers, in your own words" fail
     fi
     ;;
+  05)
+    # Module 05 is named, in docs/workshop-design.md itself, as this arc's
+    # weakest deterministic tier: real live web research against the real
+    # internet, not a workshop-supplied fixture. This checker is deliberately
+    # [structural-only] -- it verifies the brief's shape and sourcing
+    # discipline (does it exist, does it have the required sections, does it
+    # cite real-looking sources from more than one site, does its comparison
+    # table actually have content in every cell), never whether any specific
+    # price or feature claim is true. That substance is this module's Tier-2
+    # reflection, not something a local script can check against a live,
+    # third-party website without becoming network-dependent itself.
+
+    # 1. 05-research/ itself is a real directory, not a symlink standing in
+    #    for one -- same convention as 02-meet/'s own directory check.
+    EXPECTED_05_RESEARCH="$ROOT/05-research"
+    RESEARCH_DIR_OK=true
+    if [[ -e "$EXPECTED_05_RESEARCH" ]]; then
+      REAL_05_RESEARCH="$(cd "$EXPECTED_05_RESEARCH" 2>/dev/null && pwd -P || echo "")"
+      if [[ "$REAL_05_RESEARCH" != "$EXPECTED_05_RESEARCH" ]]; then
+        RESEARCH_DIR_OK=false
+      fi
+    fi
+
+    # 2. 05-research/comparison-brief.md exists for real -- not a symlink,
+    #    and not a hard link either (checked via link count, the same
+    #    convention as 02-meet/summary.txt, since this file is learner/
+    #    Claude-Code-authored, not copied from a fixture, so there's no
+    #    single reference inode to compare against).
+    BRIEF="$ROOT/05-research/comparison-brief.md"
+    BRIEF_LINK_COUNT="$(stat -f '%l' "$BRIEF" 2>/dev/null || stat -c '%h' "$BRIEF" 2>/dev/null || echo "1")"
+    BRIEF_REAL_FILE=false
+    if [[ "$RESEARCH_DIR_OK" == false ]]; then
+      check "05-research/comparison-brief.md exists and is non-empty (05-research/ is a symlink, not a real directory)" fail
+    elif [[ -L "$BRIEF" ]]; then
+      check "05-research/comparison-brief.md exists and is non-empty (found a symlink, not a real file)" fail
+    elif [[ -f "$BRIEF" && "$BRIEF_LINK_COUNT" != "1" ]]; then
+      check "05-research/comparison-brief.md exists and is non-empty (found a hard link, not an independently-written file)" fail
+    elif [[ -s "$BRIEF" ]]; then
+      check "05-research/comparison-brief.md exists and is non-empty" pass
+      BRIEF_REAL_FILE=true
+    else
+      check "05-research/comparison-brief.md exists and is non-empty" fail
+    fi
+
+    # 3. All 4 required section headers present, verbatim -- a closed set,
+    #    the module's own text names these exact four strings. An ordinary
+    #    indexed array (not `declare -A`) is fine under bash 3.2; only
+    #    associative arrays crash it.
+    REQUIRED_HEADERS=("## Platforms Compared" "## Pricing" "## Features" "## Recommendation")
+    if [[ "$BRIEF_REAL_FILE" == true ]]; then
+      MISSING_HEADERS=()
+      for h in "${REQUIRED_HEADERS[@]}"; do
+        grep -qxF "$h" "$BRIEF" 2>/dev/null || MISSING_HEADERS+=("$h")
+      done
+      if [[ "${#MISSING_HEADERS[@]}" -eq 0 ]]; then
+        check "comparison-brief.md has all 4 required section headers" pass
+      else
+        check "comparison-brief.md has all 4 required section headers (still missing: ${MISSING_HEADERS[*]})" fail
+      fi
+    else
+      check "comparison-brief.md has all 4 required section headers" fail
+    fi
+
+    # 4. At least 3 source URLs from at least 3 distinct hostnames -- a
+    #    count, not a pattern match, and not a reachability check (this
+    #    checker makes no network calls of its own; verifying a URL is live
+    #    is out of scope, named honestly in the module text as Part 4's job,
+    #    not this script's). Extracts the scheme+host of every http(s) URL
+    #    in the file, lowercases it, and counts distinct values -- so
+    #    http://Example.com and https://example.com/pricing both count as
+    #    the same site, but a URL repeated verbatim only counts once either
+    #    way.
+    if [[ "$BRIEF_REAL_FILE" == true ]]; then
+      HOSTNAMES="$(grep -oE 'https?://[A-Za-z0-9.-]+' "$BRIEF" 2>/dev/null | sed -E 's#^https?://##' | tr '[:upper:]' '[:lower:]' | sort -u)"
+      HOSTNAME_COUNT="$(printf '%s\n' "$HOSTNAMES" | grep -c '.' || true)"
+      if [[ "$HOSTNAME_COUNT" -ge 3 ]]; then
+        check "comparison-brief.md cites source URLs from at least 3 distinct sites (found $HOSTNAME_COUNT)" pass
+      else
+        check "comparison-brief.md cites source URLs from at least 3 distinct sites (found $HOSTNAME_COUNT)" fail
+      fi
+    else
+      check "comparison-brief.md cites source URLs from at least 3 distinct sites" fail
+    fi
+
+    # 5. A comparison table exists with at least 3 data rows (plus a header
+    #    row, so at least 4 pipe-delimited content rows total) and no empty
+    #    cells in any of them -- a reasonable structural proxy for "every
+    #    claim row in the required comparison table non-empty," per
+    #    docs/workshop-design.md §7, without trying to validate that any
+    #    individual cell's content is factually correct.
+    #    A markdown table row matches `^\|.*\|[[:space:]]*$`; its separator
+    #    row (the `|---|---|---|` line under the header) is told apart from
+    #    a real content row by stripping every `|`, `:`, `*`, `-`, and space
+    #    character from the line and checking whether anything is left --
+    #    a separator row has nothing left, a real row (even one made mostly
+    #    of dashes and colons in its actual text) still does. A single-regex
+    #    version of this same idea was tried first and was wrong: it only
+    #    matched between the FIRST and LAST pipe on the line, so a real
+    #    4-column separator (three internal pipes) never matched at all and
+    #    the check failed a perfectly correct table -- caught by running this
+    #    check against a real, honestly-written table, not by reading the
+    #    regex.
+    if [[ "$BRIEF_REAL_FILE" == true ]]; then
+      TABLE_LINES="$(grep -E '^\|.*\|[[:space:]]*$' "$BRIEF" 2>/dev/null || true)"
+      CONTENT_ROWS=0
+      EMPTY_CELL_ROWS=0
+      HAS_SEPARATOR=false
+      while IFS= read -r line; do
+        [[ -z "$line" ]] && continue
+        STRIPPED="$(printf '%s' "$line" | sed 's/[|:*[:space:]-]//g')"
+        if [[ -z "$STRIPPED" ]]; then
+          HAS_SEPARATOR=true
+          continue
+        fi
+        CONTENT_ROWS=$((CONTENT_ROWS + 1))
+        INNER="${line#|}"
+        INNER="${INNER%|}"
+        ROW_EMPTY=false
+        OLDIFS="$IFS"
+        IFS='|'
+        read -ra CELLS <<< "$INNER"
+        IFS="$OLDIFS"
+        for cell in "${CELLS[@]}"; do
+          TRIMMED="$(printf '%s' "$cell" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+          [[ -z "$TRIMMED" ]] && ROW_EMPTY=true
+        done
+        if [[ "$ROW_EMPTY" == true ]]; then
+          EMPTY_CELL_ROWS=$((EMPTY_CELL_ROWS + 1))
+        fi
+      done <<< "$TABLE_LINES"
+      if [[ "$HAS_SEPARATOR" == true && "$CONTENT_ROWS" -ge 4 && "$EMPTY_CELL_ROWS" -eq 0 ]]; then
+        check "comparison-brief.md has a comparison table with at least 3 rows and no empty cells" pass
+      else
+        check "comparison-brief.md has a comparison table with at least 3 rows and no empty cells" fail
+      fi
+    else
+      check "comparison-brief.md has a comparison table with at least 3 rows and no empty cells" fail
+    fi
+
+    # 6. Own-words answers file: same discipline as every earlier module --
+    #    presence-checked for genuine content, rejecting the literal
+    #    placeholder text from the module page itself, and rejecting a
+    #    symlink or hard link standing in for a real file.
+    ANSWERS05="$ROOT/05-research/answers.txt"
+    ANSWERS05_LINK_COUNT="$(stat -f '%l' "$ANSWERS05" 2>/dev/null || stat -c '%h' "$ANSWERS05" 2>/dev/null || echo "1")"
+    PLACEHOLDER_SOURCES05="<did you open at least one cited page yourself and compare it to what the brief says? what did you find?>"
+    PLACEHOLDER_DISAGREE05="<did the sources disagree with each other about anything, or did Claude Code's first answer turn out to be wrong once you checked? what happened?>"
+    PLACEHOLDER_CONFIDENCE05="<how much would you trust this brief if you were handing it to Tilghman today, and what would you still want to double-check?>"
+    if [[ "$RESEARCH_DIR_OK" == false ]]; then
+      check "05-research/answers.txt has all three reflection answers, in your own words (05-research/ is a symlink, not a real directory)" fail
+    elif [[ -L "$ANSWERS05" ]]; then
+      check "05-research/answers.txt has all three reflection answers, in your own words (found a symlink, not a real file)" fail
+    elif [[ -f "$ANSWERS05" && "$ANSWERS05_LINK_COUNT" != "1" ]]; then
+      check "05-research/answers.txt has all three reflection answers, in your own words (found a hard link, not an independently-written file)" fail
+    elif [[ -f "$ANSWERS05" ]]; then
+      MISSING_LABELS=()
+      # Bash-3.2-safe case statement, not an associative array -- see the
+      # matching comment on Module 01's identical pattern, above, for why.
+      for label in "SOURCES_CHECKED:" "DISAGREEMENT:" "CONFIDENCE:"; do
+        case "$label" in
+          "SOURCES_CHECKED:") EXPECTED_PLACEHOLDER="$PLACEHOLDER_SOURCES05" ;;
+          "DISAGREEMENT:") EXPECTED_PLACEHOLDER="$PLACEHOLDER_DISAGREE05" ;;
+          "CONFIDENCE:") EXPECTED_PLACEHOLDER="$PLACEHOLDER_CONFIDENCE05" ;;
+        esac
+        LINE="$(grep -m1 "^$label" "$ANSWERS05" 2>/dev/null || true)"
+        VALUE="$(echo "$LINE" | sed "s/^$label//" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+        if [[ -z "$VALUE" || "$VALUE" == "$EXPECTED_PLACEHOLDER" ]]; then
+          MISSING_LABELS+=("$label")
+        fi
+      done
+      if [[ "${#MISSING_LABELS[@]}" -eq 0 ]]; then
+        check "05-research/answers.txt has all three reflection answers, in your own words" pass
+      else
+        check "05-research/answers.txt has all three reflection answers, in your own words (still needed: ${MISSING_LABELS[*]})" fail
+      fi
+    else
+      check "05-research/answers.txt has all three reflection answers, in your own words" fail
+    fi
+    ;;
   *)
     echo "No checks defined yet for module '$MODULE'." >&2
     exit 2
