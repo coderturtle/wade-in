@@ -479,17 +479,34 @@ case "$MODULE" in
       check "comparison-brief.md has all 4 required section headers" fail
     fi
 
-    # 4. At least 3 source URLs from at least 3 distinct hostnames -- a
-    #    count, not a pattern match, and not a reachability check (this
-    #    checker makes no network calls of its own; verifying a URL is live
-    #    is out of scope, named honestly in the module text as Part 4's job,
-    #    not this script's). Extracts the scheme+host of every http(s) URL
-    #    in the file, lowercases it, and counts distinct values -- so
-    #    http://Example.com and https://example.com/pricing both count as
-    #    the same site, but a URL repeated verbatim only counts once either
-    #    way.
+    # 4. At least 3 source URLs from at least 3 distinct SITES -- a count,
+    #    not a pattern match, and not a reachability check (this checker
+    #    makes no network calls of its own; verifying a URL is live is out
+    #    of scope, named honestly in the module text as Part 4's job, not
+    #    this script's). "Site" is approximated as the last two dot-
+    #    separated labels of the hostname (a naive registrable-domain
+    #    guess, not a real public-suffix-list lookup), specifically so
+    #    `www.eventbrite.com` and `checkout.eventbrite.com` count as the
+    #    SAME site as `eventbrite.com` -- found by a fresh-context
+    #    adversarial pass, which cited one real company three times via
+    #    three subdomains and passed "3 distinct sites" while researching
+    #    exactly one platform. A trailing sentence-final period (a bare
+    #    URL with no path, at the end of a sentence, e.g. "...see
+    #    https://eventbrite.com.") is stripped before comparison too --
+    #    the same pass found this turned two real citations of one site
+    #    into an apparent third, from completely ordinary prose, not
+    #    deliberate gaming. Named limit: the last-two-labels heuristic is
+    #    wrong for multi-part public suffixes like `co.uk` (it would treat
+    #    `example.co.uk` as site "co.uk") -- accepted for now since no
+    #    ticketing platform this module expects uses one, not claimed to
+    #    be a general-purpose registrable-domain parser.
     if [[ "$BRIEF_REAL_FILE" == true ]]; then
-      HOSTNAMES="$(grep -oE 'https?://[A-Za-z0-9.-]+' "$BRIEF" 2>/dev/null | sed -E 's#^https?://##' | tr '[:upper:]' '[:lower:]' | sort -u)"
+      HOSTNAMES="$(grep -oE 'https?://[A-Za-z0-9.-]+' "$BRIEF" 2>/dev/null \
+        | sed -E 's#^https?://##' \
+        | sed -E 's/\.$//' \
+        | tr '[:upper:]' '[:lower:]' \
+        | awk -F'.' '{if (NF>=2) print $(NF-1)"."$NF; else print $0}' \
+        | sort -u)"
       HOSTNAME_COUNT="$(printf '%s\n' "$HOSTNAMES" | grep -c '.' || true)"
       if [[ "$HOSTNAME_COUNT" -ge 3 ]]; then
         check "comparison-brief.md cites source URLs from at least 3 distinct sites (found $HOSTNAME_COUNT)" pass
@@ -500,31 +517,46 @@ case "$MODULE" in
       check "comparison-brief.md cites source URLs from at least 3 distinct sites" fail
     fi
 
-    # 5. A comparison table exists with at least 3 data rows (plus a header
-    #    row, so at least 4 pipe-delimited content rows total) and no empty
-    #    cells in any of them -- a reasonable structural proxy for "every
-    #    claim row in the required comparison table non-empty," per
-    #    docs/workshop-design.md §7, without trying to validate that any
-    #    individual cell's content is factually correct.
-    #    A markdown table row matches `^\|.*\|[[:space:]]*$`; its separator
-    #    row (the `|---|---|---|` line under the header) is told apart from
-    #    a real content row by stripping every `|`, `:`, `*`, `-`, and space
-    #    character from the line and checking whether anything is left --
-    #    a separator row has nothing left, a real row (even one made mostly
-    #    of dashes and colons in its actual text) still does. A single-regex
-    #    version of this same idea was tried first and was wrong: it only
-    #    matched between the FIRST and LAST pipe on the line, so a real
-    #    4-column separator (three internal pipes) never matched at all and
-    #    the check failed a perfectly correct table -- caught by running this
-    #    check against a real, honestly-written table, not by reading the
-    #    regex.
+    # 5. A comparison table exists, INSIDE THE PRICING SECTION SPECIFICALLY,
+    #    with at least 3 data rows (plus a header row, so at least 4 pipe-
+    #    delimited content rows total) and no empty cells in any of them --
+    #    a reasonable structural proxy for "every claim row in the required
+    #    comparison table non-empty," per docs/workshop-design.md §7,
+    #    without trying to validate that any individual cell's content is
+    #    factually correct.
+    #    Scoping to the Pricing section (from its own header to the next
+    #    "## " header, or end of file) is itself a fix: a fresh-context
+    #    adversarial pass found the original version scanned the WHOLE
+    #    document, so an unrelated decorative table anywhere else (e.g.
+    #    stray notes under Features) could either falsely PASS a brief with
+    #    no real Pricing table at all, or falsely FAIL a perfectly correct
+    #    Pricing table over one unrelated blank cell somewhere else in the
+    #    file -- both reproduced directly.
+    #    A markdown table row matches (after trimming leading whitespace,
+    #    since a table indented under a list item or reformatted with a
+    #    couple of leading spaces is still valid Markdown and was
+    #    demonstrated to be silently rejected by a stricter
+    #    column-zero-only version of this regex) `^\|.*\|[[:space:]]*$`;
+    #    its separator row (the `|---|---|---|` line under the header) is
+    #    told apart from a real content row by stripping every `|`, `:`,
+    #    `*`, `-`, and space character from the line and checking whether
+    #    anything is left -- a separator row has nothing left, a real row
+    #    (even one made mostly of dashes and colons in its actual text)
+    #    still does. A single-regex version of this same idea was tried
+    #    first and was wrong: it only matched between the FIRST and LAST
+    #    pipe on the line, so a real 4-column separator (three internal
+    #    pipes) never matched at all and the check failed a perfectly
+    #    correct table -- caught by running this check against a real,
+    #    honestly-written table, not by reading the regex.
     if [[ "$BRIEF_REAL_FILE" == true ]]; then
-      TABLE_LINES="$(grep -E '^\|.*\|[[:space:]]*$' "$BRIEF" 2>/dev/null || true)"
+      PRICING_SECTION="$(awk '/^## Pricing[[:space:]]*$/{flag=1; next} /^## /{flag=0} flag' "$BRIEF" 2>/dev/null)"
+      TABLE_LINES="$(printf '%s\n' "$PRICING_SECTION" | grep -E '^[[:space:]]*\|.*\|[[:space:]]*$' 2>/dev/null || true)"
       CONTENT_ROWS=0
       EMPTY_CELL_ROWS=0
       HAS_SEPARATOR=false
-      while IFS= read -r line; do
-        [[ -z "$line" ]] && continue
+      while IFS= read -r raw_line; do
+        [[ -z "$raw_line" ]] && continue
+        line="$(printf '%s' "$raw_line" | sed 's/^[[:space:]]*//')"
         STRIPPED="$(printf '%s' "$line" | sed 's/[|:*[:space:]-]//g')"
         if [[ -z "$STRIPPED" ]]; then
           HAS_SEPARATOR=true
