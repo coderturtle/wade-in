@@ -131,10 +131,12 @@ This checks, for real: `03-files/staff-list-corrected.txt` exists and is a genui
 shortcut standing in for one); the workshop's own fixtures haven't been tampered with; all four of
 Emmett's corrections were actually applied, re-derived from his memo's own wording each time this
 runs rather than from a fixed answer this script has memorized - so it stays correct even if the
-memo's exact phrasing is ever revised; every other line of the file is byte-for-byte identical to
-the original, catching any collateral edit anywhere else in the file, not just the four known
-spots; and `CLAUDE.md` contains at least 3 of the 4 required headings, exactly as written above.
-It prints `RESULT: PASS (n/n)` when everything's there.
+memo's exact phrasing is ever revised; every other line of the file matches the original, catching
+any collateral edit anywhere else in the file, not just the four known spots (an incidental trailing
+blank line at the very end of the file won't trip this, but a changed word anywhere will);
+`CLAUDE.md` contains at least 3 of the 4 required headings, exactly as written above; and the
+original safety headings from Module 01 are still there too - you're adding sections, not replacing
+the file. It prints `RESULT: PASS (n/n)` when everything's there.
 
 **A short answers file.** Create `03-files/answers.txt`, containing three lines, each starting
 with the label shown:

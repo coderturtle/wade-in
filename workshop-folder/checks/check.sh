@@ -527,11 +527,24 @@ case "$MODULE" in
           s/\Q$ENV{WRONG4}\E/$ENV{RIGHT4}/;
         ' "$STAFF_FIXTURE" > "$EXPECTED_TMP" 2>/dev/null
 
-        EXPECTED_SUM="$(file_checksum "$EXPECTED_TMP" 2>/dev/null || echo "EXPECTED_BUILD_FAILED")"
-        LEARNER_SUM="$(file_checksum "$CORRECTED" 2>/dev/null || echo "LEARNER_READ_FAILED")"
+        # Compare with a trailing-newline-normalized checksum, not the raw
+        # file bytes -- found by a fresh-context adversarial pass: a fully
+        # correct submission (all 4 corrections applied, nothing else
+        # touched) that differed from the expected file ONLY by a missing
+        # or extra trailing newline -- an invisible, extremely common
+        # artifact of how a tool writes a file -- failed with a message
+        # ("no other line changed") that actively misled the learner about
+        # the real cause. `$(cat file)` strips all trailing newlines in
+        # bash command substitution; hashing that normalized form (not the
+        # raw file) makes trailing-newline differences invisible to this
+        # check while staying fully sensitive to every other byte,
+        # including mid-file blank lines and trailing whitespace within a
+        # line -- only the absolute end-of-file newline count is ignored.
+        EXPECTED_NORMALIZED_SUM="$(printf '%s' "$(cat "$EXPECTED_TMP" 2>/dev/null)" | file_checksum /dev/stdin 2>/dev/null || echo "EXPECTED_BUILD_FAILED")"
+        LEARNER_NORMALIZED_SUM="$(printf '%s' "$(cat "$CORRECTED" 2>/dev/null)" | file_checksum /dev/stdin 2>/dev/null || echo "LEARNER_READ_FAILED")"
         rm -f "$EXPECTED_TMP"
 
-        if [[ "$EXPECTED_SUM" == "$LEARNER_SUM" ]]; then
+        if [[ "$EXPECTED_NORMALIZED_SUM" == "$LEARNER_NORMALIZED_SUM" ]]; then
           check "staff-list-corrected.txt has all 4 corrections applied, with no other line changed" pass
         else
           check "staff-list-corrected.txt has all 4 corrections applied, with no other line changed" fail
@@ -571,6 +584,32 @@ case "$MODULE" in
       fi
     else
       check "CLAUDE.md has at least 3 of the 4 required house-rules section headers" fail
+    fi
+
+    # 5b. The Module 01 safety preamble is still present -- found by a
+    #    fresh-context adversarial pass: a session asked to "add sections"
+    #    to CLAUDE.md could plausibly regenerate the whole file instead of
+    #    appending, silently dropping the original "Never touch checks/"
+    #    and "stay inside this folder" instructions while still adding all
+    #    4 new headers cleanly -- reproduced directly, a full 5/5 pass with
+    #    the original safety content entirely gone. This can't prove the
+    #    CONTENT still means what it meant (a determined rewrite could keep
+    #    the heading text and gut the instruction under it, the same
+    #    provenance limit every module's checks already carry) but it does
+    #    catch the specific, plausible accident this module's own task
+    #    invites: the two original headings disappearing outright.
+    if [[ -f "$CLAUDE_MD" && ! -L "$CLAUDE_MD" && "$CLAUDE_LINK_COUNT" == "1" ]]; then
+      SAFETY_PREAMBLE_OK=true
+      for original_header in "## Never touch \`checks/\`" "## Stay inside this folder unless a module says otherwise"; do
+        grep -Fxq "$original_header" "$CLAUDE_MD" 2>/dev/null || SAFETY_PREAMBLE_OK=false
+      done
+      if [[ "$SAFETY_PREAMBLE_OK" == true ]]; then
+        check "CLAUDE.md still has the original Module 01 safety headings (not overwritten)" pass
+      else
+        check "CLAUDE.md still has the original Module 01 safety headings (not overwritten - add your new sections, don't replace the file)" fail
+      fi
+    else
+      check "CLAUDE.md still has the original Module 01 safety headings (not overwritten)" fail
     fi
 
     # 6. Own-words answers file: same discipline as Modules 01-02 -- presence-
