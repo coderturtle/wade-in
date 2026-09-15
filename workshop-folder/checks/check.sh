@@ -117,6 +117,19 @@ file_inode() {
   stat -f '%i' "$1" 2>/dev/null || stat -c '%i' "$1" 2>/dev/null || echo "NO_STAT_TOOL"
 }
 
+trim_field() {
+  # Strip leading/trailing whitespace from one CSV field value. Found by a
+  # fresh-context adversarial pass on Module 07: a semantically-correct
+  # merge, written with a space after each comma (`BK-101, Name, ...`
+  # instead of no-space CSV -- a plausible style if a script hand-writes
+  # the CSV as text), failed 3 of 8 checks with generic messages giving no
+  # hint the real cause was stray whitespace, not a merge error. Trimming
+  # each field before comparison treats "400" and " 400" as the same
+  # value, matching what a human would consider "the same," without
+  # weakening the exact-match check against any REAL content difference.
+  printf '%s' "$1" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'
+}
+
 array_index_of() {
   # Bash-3.2-safe lookup: given a target value and a haystack passed as
   # remaining args, print the matching index or "-1". This, plus a plain
@@ -519,7 +532,13 @@ case "$MODULE" in
     if [[ "$LEARNER_FILE_OK" == true ]]; then
       ACTUAL_HEADER="$(sed -n '1p' "$OUTPUT_FILE" 2>/dev/null)"
       ACTUAL_HEADER="${ACTUAL_HEADER%$'\r'}"
-      if [[ "$ACTUAL_HEADER" == "$REQUIRED_HEADER" ]]; then
+      # Compare column-by-column, each trimmed, not the raw header string --
+      # same reasoning as trim_field above: "booking_id, name, ..." (a space
+      # after the comma) is the same header to a human as "booking_id,name",
+      # and this module never taught CSV syntax closely enough to make that
+      # distinction load-bearing.
+      ACTUAL_HEADER_TRIMMED="$(printf '%s' "$ACTUAL_HEADER" | awk -F',' '{for(i=1;i<=NF;i++){gsub(/^[ \t]+|[ \t]+$/,"",$i)}; out=$1; for(i=2;i<=NF;i++){out=out","$i}; print out}')"
+      if [[ "$ACTUAL_HEADER_TRIMMED" == "$REQUIRED_HEADER" ]]; then
         check "bookings-clean.csv has the exact required header row" pass
       else
         check "bookings-clean.csv has the exact required header row" fail
@@ -590,6 +609,12 @@ case "$MODULE" in
           continue
         fi
         a_total="${a_total%$'\r'}"
+        a_id="$(trim_field "$a_id")"
+        a_name="$(trim_field "$a_name")"
+        a_date="$(trim_field "$a_date")"
+        a_deposit="$(trim_field "$a_deposit")"
+        a_balance="$(trim_field "$a_balance")"
+        a_total="$(trim_field "$a_total")"
         if [[ -z "$a_id" && -z "$a_name" && -z "$a_date" && -z "$a_deposit" && -z "$a_balance" && -z "$a_total" ]]; then
           continue
         fi
