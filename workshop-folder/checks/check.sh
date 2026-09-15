@@ -237,15 +237,26 @@ case "$MODULE" in
     PLACEHOLDER_STUCK="<what would you do if the terminal looked stuck?>"
     if [[ -f "$ANSWERS" ]]; then
       MISSING_LABELS=()
-      declare -A PLACEHOLDER_FOR=(
-        ["PROMPT:"]="$PLACEHOLDER_PROMPT"
-        ["CURRENT_DIRECTORY:"]="$PLACEHOLDER_DIR"
-        ["STUCK_TERMINAL:"]="$PLACEHOLDER_STUCK"
-      )
+      # A case statement, not an associative array (`declare -A`) -- stock
+      # macOS ships bash 3.2 (Apple stopped shipping newer bash over its
+      # GPLv3 license), which has no associative arrays at all. `declare -A`
+      # silently misbehaves there rather than erroring cleanly, and every
+      # downstream reference to the array crashes the whole script with
+      # "unbound variable" mid-run, printing no RESULT line at all. This was
+      # missed by every round of testing on this machine, since this
+      # machine's own PATH resolves `bash` to a Homebrew-installed 5.x, not
+      # the stock 3.2 a real first-time learner on a fresh Mac would have --
+      # confirmed by directly reproducing the crash with `/bin/bash`
+      # specifically, not the `bash` this session had been testing with.
       for label in "PROMPT:" "CURRENT_DIRECTORY:" "STUCK_TERMINAL:"; do
+        case "$label" in
+          "PROMPT:") EXPECTED_PLACEHOLDER="$PLACEHOLDER_PROMPT" ;;
+          "CURRENT_DIRECTORY:") EXPECTED_PLACEHOLDER="$PLACEHOLDER_DIR" ;;
+          "STUCK_TERMINAL:") EXPECTED_PLACEHOLDER="$PLACEHOLDER_STUCK" ;;
+        esac
         LINE="$(grep -m1 "^$label" "$ANSWERS" 2>/dev/null || true)"
         VALUE="$(echo "$LINE" | sed "s/^$label//" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
-        if [[ -z "$VALUE" || "$VALUE" == "${PLACEHOLDER_FOR[$label]}" ]]; then
+        if [[ -z "$VALUE" || "$VALUE" == "$EXPECTED_PLACEHOLDER" ]]; then
           MISSING_LABELS+=("$label")
         fi
       done
