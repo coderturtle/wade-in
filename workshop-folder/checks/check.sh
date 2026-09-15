@@ -123,6 +123,8 @@ file_inode() {
 # changes -- never let it silently drift from what's actually on disk.
 EXPECTED_WELCOME_NOTE_SHA256="f9f6b278a9732f0dbcc0969414f34d7365942ce8e8aea705775a5e933b8e7475"
 EXPECTED_VENUE_HISTORY_SHA256="3afe8aea8f84e6fff4da67c0f48d14b7956c6630ff06756c2ea2bb6180eec7a5"
+EXPECTED_STAFF_LIST_SHA256="f7e6af0c87228e99d6d880b0b4b10bc1cda45e708f03235eaa2fcd973be9243f"
+EXPECTED_EMMETT_MEMO_SHA256="7abfa8b6da208141a046ac44fc903e56d4692cd4d190b9660ed3d2526a9fb5d3"
 
 echo "-- Wade In required checklist: Module $MODULE ------------------------"
 echo ""
@@ -414,6 +416,201 @@ case "$MODULE" in
       fi
     else
       check "02-meet/answers.txt has all three reflection answers, in your own words" fail
+    fi
+    ;;
+  03)
+    # 1. 03-files/ itself is a real directory, not a symlink standing in for
+    #    one -- same convention as 01-terminal/my-notes/ and 02-meet/.
+    EXPECTED_03_FILES="$ROOT/03-files"
+    FILES_DIR_OK=true
+    if [[ -e "$EXPECTED_03_FILES" ]]; then
+      REAL_03_FILES="$(cd "$EXPECTED_03_FILES" 2>/dev/null && pwd -P || echo "")"
+      if [[ "$REAL_03_FILES" != "$EXPECTED_03_FILES" ]]; then
+        FILES_DIR_OK=false
+      fi
+    fi
+
+    CORRECTED="$ROOT/03-files/staff-list-corrected.txt"
+    STAFF_FIXTURE="$ROOT/fixtures/staff-list.txt"
+    MEMO_FIXTURE="$ROOT/fixtures/emmett-memo.txt"
+
+    # 2. staff-list-corrected.txt exists for real -- not a symlink, and not a
+    #    hard link either (same discipline as 02-meet/summary.txt: a fresh
+    #    link count above 1 means some other path shares these exact bytes,
+    #    which a freshly-produced corrected file never does on its own).
+    CORRECTED_LINK_COUNT="$(stat -f '%l' "$CORRECTED" 2>/dev/null || stat -c '%h' "$CORRECTED" 2>/dev/null || echo "1")"
+    if [[ "$FILES_DIR_OK" == false ]]; then
+      check "03-files/staff-list-corrected.txt exists (03-files/ is a symlink, not a real directory)" fail
+    elif [[ -L "$CORRECTED" ]]; then
+      check "03-files/staff-list-corrected.txt exists (found a symlink, not a real file)" fail
+    elif [[ -f "$CORRECTED" && "$CORRECTED_LINK_COUNT" != "1" ]]; then
+      check "03-files/staff-list-corrected.txt exists (found a hard link, not an independently-written file)" fail
+    elif [[ -s "$CORRECTED" ]]; then
+      check "03-files/staff-list-corrected.txt exists and is non-empty" pass
+    else
+      check "03-files/staff-list-corrected.txt exists and is non-empty" fail
+    fi
+    CORRECTED_REAL_FILE=false
+    [[ "$FILES_DIR_OK" == true && -f "$CORRECTED" && ! -L "$CORRECTED" && "$CORRECTED_LINK_COUNT" == "1" ]] && CORRECTED_REAL_FILE=true
+
+    # 3. Both fixtures match their pinned checksums -- must pass before any
+    #    value recomputed from them can be trusted. Same embedded-checksum
+    #    discipline as every fixture above; a tampered memo (e.g. edited to
+    #    claim a different "correct" phone number) would otherwise make the
+    #    check below faithfully verify against the tampered value instead of
+    #    the real one.
+    if [[ "$CHECKSUM_TOOL_AVAILABLE" == false ]]; then
+      check "workshop fixtures staff-list.txt and emmett-memo.txt match their expected content (couldn't verify: no checksum tool found on this system - contact the workshop)" fail
+      FIXTURES_03_OK=false
+    else
+      STAFF_SUM="$(file_checksum "$STAFF_FIXTURE" 2>/dev/null || echo "MISSING_FIXTURE")"
+      MEMO_SUM="$(file_checksum "$MEMO_FIXTURE" 2>/dev/null || echo "MISSING_FIXTURE")"
+      if [[ "$STAFF_SUM" == "$EXPECTED_STAFF_LIST_SHA256" && "$MEMO_SUM" == "$EXPECTED_EMMETT_MEMO_SHA256" ]]; then
+        check "workshop fixtures staff-list.txt and emmett-memo.txt match their expected content" pass
+        FIXTURES_03_OK=true
+      else
+        check "workshop fixtures staff-list.txt and emmett-memo.txt match their expected content (contact the workshop, not your own mistake)" fail
+        FIXTURES_03_OK=false
+      fi
+    fi
+
+    # 4. Recompute the expected corrected file from the pristine fixtures,
+    #    then compare the learner's submission to it byte-for-byte. This one
+    #    whole-file comparison proves BOTH that all 4 corrections were
+    #    actually applied AND that no other line was collaterally edited -- a
+    #    wrong value, a missed correction, or a stray edit anywhere else in
+    #    the file all produce a non-matching file and fail together.
+    #
+    #    The 4 wrong/correct value pairs are parsed from the memo's OWN text
+    #    at check time, never hardcoded here -- each correction in the memo
+    #    follows the fixed pattern "<subject> says <wrong>, but it should say
+    #    <correct>.", and the line-selecting anchor phrases below (e.g.
+    #    "Penny Johnson's line says") are fixed prose the fixture was
+    #    authored with, not a hardcoded answer key. If the memo's wording is
+    #    ever revised, this recomputation moves with it, same discipline as
+    #    Module 02's fixture-derived facts.
+    #
+    #    Substitution uses perl's \Q...\E (quote-metacharacters) rather than
+    #    a bash parameter-expansion substitution or a hand-escaped sed
+    #    pattern: tested directly against stock macOS bash 3.2, and
+    #    `${var/"$pattern"/"$replacement"}` does NOT strip the quotes there
+    #    the way it does under bash 5 -- it inserts literal double-quote
+    #    characters into the output. Reproduced directly, not assumed; perl
+    #    (already relied on elsewhere in this repo) sidesteps both that bug
+    #    and any need to hand-escape regex metacharacters in the extracted
+    #    values.
+    if [[ "$CORRECTED_REAL_FILE" == true && "$FIXTURES_03_OK" == true ]]; then
+      LINE1="$(grep -m1 "Penny Johnson's line says" "$MEMO_FIXTURE" 2>/dev/null || true)"
+      LINE2="$(grep -m1 "Carl Bruner's extension says" "$MEMO_FIXTURE" 2>/dev/null || true)"
+      LINE3="$(grep -m1 "Jack Crews's job says" "$MEMO_FIXTURE" 2>/dev/null || true)"
+      LINE4="$(grep -m1 "Angelo's name says" "$MEMO_FIXTURE" 2>/dev/null || true)"
+
+      WRONG1="$(printf '%s' "$LINE1" | sed -n 's/.* says \(.*\), but it should say .*/\1/p')"
+      RIGHT1="$(printf '%s' "$LINE1" | sed -n 's/.*but it should say \([^.]*\)\..*/\1/p')"
+      WRONG2="$(printf '%s' "$LINE2" | sed -n 's/.* says \(.*\), but it should say .*/\1/p')"
+      RIGHT2="$(printf '%s' "$LINE2" | sed -n 's/.*but it should say \([^.]*\)\..*/\1/p')"
+      WRONG3="$(printf '%s' "$LINE3" | sed -n 's/.* says \(.*\), but it should say .*/\1/p')"
+      RIGHT3="$(printf '%s' "$LINE3" | sed -n 's/.*but it should say \([^.]*\)\..*/\1/p')"
+      WRONG4="$(printf '%s' "$LINE4" | sed -n 's/.* says \(.*\), but it should say .*/\1/p')"
+      RIGHT4="$(printf '%s' "$LINE4" | sed -n 's/.*but it should say \([^.]*\)\..*/\1/p')"
+
+      if [[ -z "$WRONG1" || -z "$RIGHT1" || -z "$WRONG2" || -z "$RIGHT2" || -z "$WRONG3" || -z "$RIGHT3" || -z "$WRONG4" || -z "$RIGHT4" ]]; then
+        check "staff-list-corrected.txt has all 4 corrections applied, with no other line changed (couldn't parse the memo - contact the workshop)" fail
+      else
+        EXPECTED_TMP="$(mktemp "${TMPDIR:-/tmp}/wade-in-03-expected.XXXXXX" 2>/dev/null || echo "/tmp/wade-in-03-expected.$$")"
+        WRONG1="$WRONG1" RIGHT1="$RIGHT1" WRONG2="$WRONG2" RIGHT2="$RIGHT2" \
+        WRONG3="$WRONG3" RIGHT3="$RIGHT3" WRONG4="$WRONG4" RIGHT4="$RIGHT4" \
+        perl -pe '
+          s/\Q$ENV{WRONG1}\E/$ENV{RIGHT1}/;
+          s/\Q$ENV{WRONG2}\E/$ENV{RIGHT2}/;
+          s/\Q$ENV{WRONG3}\E/$ENV{RIGHT3}/;
+          s/\Q$ENV{WRONG4}\E/$ENV{RIGHT4}/;
+        ' "$STAFF_FIXTURE" > "$EXPECTED_TMP" 2>/dev/null
+
+        EXPECTED_SUM="$(file_checksum "$EXPECTED_TMP" 2>/dev/null || echo "EXPECTED_BUILD_FAILED")"
+        LEARNER_SUM="$(file_checksum "$CORRECTED" 2>/dev/null || echo "LEARNER_READ_FAILED")"
+        rm -f "$EXPECTED_TMP"
+
+        if [[ "$EXPECTED_SUM" == "$LEARNER_SUM" ]]; then
+          check "staff-list-corrected.txt has all 4 corrections applied, with no other line changed" pass
+        else
+          check "staff-list-corrected.txt has all 4 corrections applied, with no other line changed" fail
+        fi
+      fi
+    else
+      check "staff-list-corrected.txt has all 4 corrections applied, with no other line changed" fail
+    fi
+
+    # 5. wade-in-workshop/CLAUDE.md (the same file Module 01 already created
+    #    at the workshop root -- see docs/workshop-design.md §14 item 5) now
+    #    contains at least 3 of the 4 required section headers, each matched
+    #    as an EXACT whole line (`grep -Fxq`), not a substring -- so the
+    #    file's own pre-existing "## Never touch `checks/`" heading (a
+    #    different, longer line) never accidentally counts as the required
+    #    "## Never touch" header. A case statement, not `declare -A`, per
+    #    this script's own bash-3.2 rule established above.
+    CLAUDE_MD="$ROOT/CLAUDE.md"
+    CLAUDE_LINK_COUNT="$(stat -f '%l' "$CLAUDE_MD" 2>/dev/null || stat -c '%h' "$CLAUDE_MD" 2>/dev/null || echo "1")"
+    if [[ -L "$CLAUDE_MD" ]]; then
+      check "CLAUDE.md has at least 3 of the 4 required house-rules section headers (found a symlink, not a real file)" fail
+    elif [[ -f "$CLAUDE_MD" && "$CLAUDE_LINK_COUNT" != "1" ]]; then
+      check "CLAUDE.md has at least 3 of the 4 required house-rules section headers (found a hard link, not an independently-written file)" fail
+    elif [[ -f "$CLAUDE_MD" ]]; then
+      HEADER_COUNT=0
+      FOUND_HEADERS=()
+      for header in "## About this folder" "## House rules" "## How I like output" "## Never touch"; do
+        if grep -Fxq "$header" "$CLAUDE_MD" 2>/dev/null; then
+          HEADER_COUNT=$((HEADER_COUNT + 1))
+          FOUND_HEADERS+=("$header")
+        fi
+      done
+      if [[ "$HEADER_COUNT" -ge 3 ]]; then
+        check "CLAUDE.md has at least 3 of the 4 required house-rules section headers (found $HEADER_COUNT/4)" pass
+      else
+        check "CLAUDE.md has at least 3 of the 4 required house-rules section headers (found $HEADER_COUNT/4: ${FOUND_HEADERS[*]:-none})" fail
+      fi
+    else
+      check "CLAUDE.md has at least 3 of the 4 required house-rules section headers" fail
+    fi
+
+    # 6. Own-words answers file: same discipline as Modules 01-02 -- presence-
+    #    checked for genuine content, rejecting the literal placeholder text
+    #    from the module page itself, and rejecting a symlink or hard link
+    #    standing in for a real file.
+    ANSWERS03="$ROOT/03-files/answers.txt"
+    ANSWERS03_LINK_COUNT="$(stat -f '%l' "$ANSWERS03" 2>/dev/null || stat -c '%h' "$ANSWERS03" 2>/dev/null || echo "1")"
+    PLACEHOLDER_RULE03="<one house rule you wrote and what specific Double Deuce filing quirk it responds to>"
+    PLACEHOLDER_CHECK03="<how you checked the corrected file yourself, against the memo, rather than trusting it on sight>"
+    PLACEHOLDER_CHANGE03="<in your own words, what will actually be different about a session's behavior now that CLAUDE.md has these rules>"
+    if [[ "$FILES_DIR_OK" == false ]]; then
+      check "03-files/answers.txt has all three reflection answers, in your own words (03-files/ is a symlink, not a real directory)" fail
+    elif [[ -L "$ANSWERS03" ]]; then
+      check "03-files/answers.txt has all three reflection answers, in your own words (found a symlink, not a real file)" fail
+    elif [[ -f "$ANSWERS03" && "$ANSWERS03_LINK_COUNT" != "1" ]]; then
+      check "03-files/answers.txt has all three reflection answers, in your own words (found a hard link, not an independently-written file)" fail
+    elif [[ -f "$ANSWERS03" ]]; then
+      MISSING_LABELS=()
+      # Bash-3.2-safe case statement, not an associative array -- see the
+      # matching comment on Module 01's identical pattern, above, for why.
+      for label in "HOUSE_RULE:" "WHAT_I_CHECKED:" "WHAT_CHANGES:"; do
+        case "$label" in
+          "HOUSE_RULE:") EXPECTED_PLACEHOLDER="$PLACEHOLDER_RULE03" ;;
+          "WHAT_I_CHECKED:") EXPECTED_PLACEHOLDER="$PLACEHOLDER_CHECK03" ;;
+          "WHAT_CHANGES:") EXPECTED_PLACEHOLDER="$PLACEHOLDER_CHANGE03" ;;
+        esac
+        LINE="$(grep -m1 "^$label" "$ANSWERS03" 2>/dev/null || true)"
+        VALUE="$(echo "$LINE" | sed "s/^$label//" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+        if [[ -z "$VALUE" || "$VALUE" == "$EXPECTED_PLACEHOLDER" ]]; then
+          MISSING_LABELS+=("$label")
+        fi
+      done
+      if [[ "${#MISSING_LABELS[@]}" -eq 0 ]]; then
+        check "03-files/answers.txt has all three reflection answers, in your own words" pass
+      else
+        check "03-files/answers.txt has all three reflection answers, in your own words (still needed: ${MISSING_LABELS[*]})" fail
+      fi
+    else
+      check "03-files/answers.txt has all three reflection answers, in your own words" fail
     fi
     ;;
   *)
