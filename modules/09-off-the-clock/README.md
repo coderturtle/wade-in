@@ -67,6 +67,16 @@ From inside your workshop folder:
 mkdir ~/wade-in-real-folder
 ```
 
+**If this prints `mkdir: ...: File exists`,** something is already sitting at that exact spot -
+stop and look at what's there first (`ls ~/wade-in-real-folder`) rather than continuing past it.
+This module's checklist looks specifically at this one fixed location, so the fix isn't to use a
+different folder name - it's to make sure this exact folder is empty and actually yours before you
+go on. If it's left over from an earlier attempt at this module, clear it out
+(`rm -r ~/wade-in-real-folder` removes it entirely, then `mkdir` again) and start clean. If it's
+something unrelated you don't recognize, stop and figure out what it is before touching it - don't
+copy your exercise files into a folder you didn't set up yourself, and don't delete something you
+don't understand.
+
 Now copy your chosen files in, one at a time, by exact name. (Typing each `cp` out individually,
 rather than using a wildcard like `*.*`, is worth the extra typing here. A wildcard copies
 whatever happens to match the pattern, which is a worse habit to build for a folder that might
@@ -257,14 +267,24 @@ This checks, for real: the workshop's own stand-in files are intact; your real f
 outside the workshop folder; `backup/` contains exactly the files your before-manifest named, each
 one byte-for-byte identical to the original (checked by checksum, not just by name, since a name
 match alone wouldn't catch an empty or corrupted backup); both manifests exist and were timestamped
-by the checklist itself, in the right order; and your safety exercise answer names exactly the
-right three situations. It prints `RESULT: PASS (9/9)` when everything's there. As always, the
-message next to anything still failing says exactly what's missing.
+by the checklist itself, in the right order; at least one genuinely new file exists from Part 5's
+directed task (not just two manifests that happen to be in order - something real actually has to
+show up); and your safety exercise answer names exactly the right three situations. It prints
+`RESULT: PASS (9/9)` when everything's there. As always, the message next to anything still failing
+says exactly what's missing.
 
-One honest limit, worth knowing: this checklist can prove your backup matches your files and that
-your manifests are in the right order. It can't prove you actually read the permission prompt in
-Part 5 before approving it, the same limit every earlier module's permission-prompt moment has had.
-That part is still on you, every time, not just today.
+Two honest limits, worth knowing plainly rather than glossed over, since this is the one module
+where getting this wrong has real consequences. First: this checklist can't prove you actually read
+the permission prompt in Part 5 before approving it, or that Claude Code itself (rather than you,
+by hand) produced the new file - the same provenance limit every earlier module's checks already
+carry. Second, and more specific to this module: "before is recorded before after" proves the
+checklist's own two stamps are in the right order, not that your backup genuinely reflects how
+things stood before Part 5 started. If something already went wrong with a file before you ran the
+backup step - a bad edit, a mistake, anything - and you only made the backup afterward, this
+checklist has no way to catch that; it would still report a clean pass, because from its own
+vantage point everything it can see happened in the right order. The real protection here isn't the
+checklist. It's doing the ritual honestly, in the order it's taught, before anything happens that
+you'd need it for - not after.
 
 **A short answers file.** Create `09-real-work/safety-plan.txt` containing three lines, each
 starting with the label shown:

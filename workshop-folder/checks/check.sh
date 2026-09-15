@@ -143,19 +143,34 @@ real_folder_path() {
   printf '%s/wade-in-real-folder' "${HOME:-$ROOT}"
 }
 
-# parse_manifest_names FILE: prints one candidate filename per line, trimmed,
-# skipping blank lines, a literal "backup" entry (the backup/ folder itself
-# routinely shows up in a plain `ls` of the real folder, since the taught
-# ritual order is copy in -> back up -> manifest), and dotfiles (OS-noise
-# like .DS_Store, not something the learner deliberately copied in).
+# parse_manifest_names FILE [BASE_DIR]: prints one candidate filename per
+# line, trimmed, skipping blank lines, the backup/ folder itself (routinely
+# shows up in a plain `ls` of the real folder, since the taught ritual order
+# is copy in -> back up -> manifest), and dotfiles (OS-noise like
+# .DS_Store, not something the learner deliberately copied in).
+# BASE_DIR, if given, makes the "backup" exclusion precise: only a real
+# DIRECTORY named "backup" is skipped, not a plain file that happens to be
+# named "backup" with no extension -- found by a fresh-context adversarial
+# pass, a real file literally named "backup" was silently dropped from
+# every manifest with no warning under the earlier, name-only version of
+# this filter. When BASE_DIR isn't given, falls back to the old name-only
+# behavior (used at the one call site that doesn't have a real folder to
+# check against yet).
 parse_manifest_names() {
   local manifest_file="$1"
+  local base_dir="${2:-}"
   [[ -f "$manifest_file" ]] || return 0
   local line trimmed
   while IFS= read -r line; do
     trimmed="$(printf '%s' "$line" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
     [[ -z "$trimmed" ]] && continue
-    [[ "$trimmed" == "backup" ]] && continue
+    if [[ "$trimmed" == "backup" ]]; then
+      if [[ -n "$base_dir" ]]; then
+        [[ -d "$base_dir/backup" ]] && continue
+      else
+        continue
+      fi
+    fi
     case "$trimmed" in
       .*) continue ;;
     esac
@@ -477,6 +492,15 @@ case "$MODULE" in
     # extracts, or otherwise displays any file's actual content anywhere -
     # every message below names files, checksums, and counts only.
     STATE_DIR="$ROOT/09-real-work"
+    # An unset/empty $HOME falls back to $ROOT inside real_folder_path(),
+    # which used to fail silently downstream with a misleading "still
+    # inside the workshop folder" message -- found by a fresh-context
+    # adversarial pass, that message misdiagnoses the actual problem (a
+    # missing $HOME in the learner's shell) as a folder-placement mistake.
+    # Name the real cause directly instead, at the one check that would
+    # otherwise report it wrong.
+    HOME_UNSET=false
+    [[ -z "${HOME:-}" ]] && HOME_UNSET=true
     REAL_FOLDER="$(real_folder_path)"
     REAL_BACKUP="$REAL_FOLDER/backup"
     BEFORE_MANIFEST="$STATE_DIR/before-manifest.txt"
@@ -530,7 +554,10 @@ case "$MODULE" in
     #    quietly defeat the entire exercise.
     REAL_FOLDER_OK=true
     REAL_FOLDER_PROBLEM=""
-    if [[ -L "$REAL_FOLDER" ]]; then
+    if [[ "$HOME_UNSET" == true ]]; then
+      REAL_FOLDER_OK=false
+      REAL_FOLDER_PROBLEM="your \$HOME environment variable isn't set, so this can't be checked - contact the workshop"
+    elif [[ -L "$REAL_FOLDER" ]]; then
       REAL_FOLDER_OK=false
       REAL_FOLDER_PROBLEM="found a symlink at $REAL_FOLDER, not a real folder - use mkdir, not ln -s"
     elif [[ ! -d "$REAL_FOLDER" ]]; then
@@ -587,7 +614,7 @@ case "$MODULE" in
         # Already pinned for this exact content - nothing to redo.
         BEFORE_OK=true
       else
-        NAMES="$(parse_manifest_names "$BEFORE_MANIFEST")"
+        NAMES="$(parse_manifest_names "$BEFORE_MANIFEST" "$REAL_FOLDER")"
         if [[ -z "$NAMES" ]]; then
           BEFORE_PROBLEM="before-manifest.txt doesn't list any real files - run it (ls $REAL_FOLDER > ...) after copying files in"
         elif [[ "$REAL_FOLDER_OK" != true ]]; then
@@ -671,6 +698,46 @@ case "$MODULE" in
       check "after-manifest.txt exists, is non-empty, and is timestamped by the checker" pass
     else
       check "after-manifest.txt exists, is non-empty, and is timestamped by the checker ($AFTER_PROBLEM)" fail
+    fi
+
+    # 4b. At least one genuinely new file exists in the real folder, present
+    #    in after-manifest.txt but not in before-manifest.txt -- real,
+    #    non-empty evidence that Part 5's directed task actually produced
+    #    something, not just that two manifests exist and are in order.
+    #    Found by a fresh-context adversarial pass: without this check,
+    #    `ls` run twice back to back with no Claude Code session ever
+    #    launched -- no new file, no permission prompt, nothing -- produced
+    #    a full RESULT: PASS (9/9). This module's entire reason to exist is
+    #    the directed real-file task; this check is what actually requires
+    #    it happened, even though it still can't prove Claude Code (rather
+    #    than the learner by hand) produced the new file's content -- the
+    #    same provenance limit every module's checks already carry.
+    NEW_FILE_OK=false
+    NEW_FILE_PROBLEM="can't check for new work until both manifests are properly recorded (see above)"
+    if [[ "$BEFORE_OK" == true && "$AFTER_OK" == true && "$REAL_FOLDER_OK" == true ]]; then
+      BEFORE_NAMES="$(parse_manifest_names "$BEFORE_MANIFEST" "$REAL_FOLDER")"
+      AFTER_NAMES="$(parse_manifest_names "$AFTER_MANIFEST" "$REAL_FOLDER")"
+      NEW_FILE_PROBLEM="after-manifest.txt lists no file that wasn't already in before-manifest.txt - do Part 5's task for real, then re-run ls"
+      while IFS= read -r nm; do
+        [[ -z "$nm" ]] && continue
+        if ! printf '%s\n' "$BEFORE_NAMES" | grep -Fxq "$nm"; then
+          npath="$REAL_FOLDER/$nm"
+          if [[ -L "$npath" ]]; then
+            NEW_FILE_PROBLEM="$nm is new but is a symlink, not a real file"
+            continue
+          fi
+          if [[ -f "$npath" && -s "$npath" ]]; then
+            NEW_FILE_OK=true
+            NEW_FILE_PROBLEM=""
+            break
+          fi
+        fi
+      done <<< "$AFTER_NAMES"
+    fi
+    if [[ "$NEW_FILE_OK" == true ]]; then
+      check "at least one new, non-empty file exists from Part 5's directed task" pass
+    else
+      check "at least one new, non-empty file exists from Part 5's directed task ($NEW_FILE_PROBLEM)" fail
     fi
 
     # 5. Chronological order: before-manifest's stamp must be no later than
