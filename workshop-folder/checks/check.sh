@@ -522,7 +522,24 @@ case "$MODULE" in
         else
           check "monthly-summary.md includes the door revenue total (\$$DOOR_TOTAL)" fail
         fi
-        if [[ "$DOC_REAL_FILE" == true ]] && echo "$DOC_NUMBER_TOKENS" | grep -qxF "$EVENTS_HELD"; then
+        # Events-held gets a stricter check than the three dollar totals: a
+        # small, common integer like this one collides constantly with
+        # unrelated numbers in ordinary prose (a date, "the 19th," a list
+        # count) -- found by a fresh-context adversarial pass, which built
+        # a real document that never states the events-held figure at all
+        # but happened to mention "the 19th" elsewhere, and passed anyway.
+        # Requiring the number to appear on the same LINE as the word
+        # "event" (case-insensitive) is a real, meaningful tightening, not
+        # a complete fix -- a line that mentions "event" AND some other
+        # unrelated number would still false-accept -- but it closes the
+        # specific, demonstrated false pass and is a named, accepted limit
+        # rather than a claim of full semantic verification.
+        if [[ "$DOC_REAL_FILE" == true ]]; then
+          EVENT_LINE_TOKENS="$(grep -iE 'event' "$DOC" 2>/dev/null | grep -oE '\$?[0-9][0-9,]*' | tr -d '$,')"
+        else
+          EVENT_LINE_TOKENS=""
+        fi
+        if [[ "$DOC_REAL_FILE" == true ]] && echo "$EVENT_LINE_TOKENS" | grep -qxF "$EVENTS_HELD"; then
           check "monthly-summary.md includes the number of events held ($EVENTS_HELD)" pass
         else
           check "monthly-summary.md includes the number of events held ($EVENTS_HELD)" fail
