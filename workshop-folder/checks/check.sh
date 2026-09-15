@@ -479,6 +479,37 @@ case "$MODULE" in
       check "04-scripts/door-report.txt exists and is non-empty" fail
     fi
 
+    # 2b. Some actual script file sits in 04-scripts/ too -- not just the
+    #    report. Found by a fresh-context adversarial review: the module's
+    #    own text promises "04-scripts/ should contain both the script
+    #    itself and door-report.txt," but nothing enforced that half of the
+    #    claim -- a learner (or their session) could hand-type door-report.txt
+    #    directly, never have Claude Code write or run anything, and still
+    #    pass every other check. Reproduced directly: a folder with only
+    #    door-report.txt and answers.txt in it passed 7/7 before this fix.
+    #    This can't prove Claude Code wrote a CORRECT script (the same
+    #    provenance limit named workshop-wide in §8 -- no local check can),
+    #    but it can and should catch the specific case of no script existing
+    #    at all, which is strictly weaker than that limit and was silently
+    #    unguarded. Any regular file other than door-report.txt/answers.txt
+    #    counts -- this workshop doesn't mandate a specific language.
+    SCRIPT_FOUND=false
+    if [[ "$SCRIPTS_DIR_OK" == true ]]; then
+      for f in "$EXPECTED_04_SCRIPTS"/*; do
+        [[ -e "$f" ]] || continue
+        BASE_NAME="$(basename "$f")"
+        if [[ "$BASE_NAME" != "door-report.txt" && "$BASE_NAME" != "answers.txt" && -f "$f" && ! -L "$f" ]]; then
+          SCRIPT_FOUND=true
+          break
+        fi
+      done
+    fi
+    if [[ "$SCRIPT_FOUND" == true ]]; then
+      check "04-scripts/ contains the script itself, not just the report" pass
+    else
+      check "04-scripts/ contains the script itself, not just the report" fail
+    fi
+
     # 3. All 12 door-count fixtures are unmodified -- checksum-verified
     #    against the embedded, pinned hashes above (never a checksum
     #    computed from the live fixture at run time, which would let a
