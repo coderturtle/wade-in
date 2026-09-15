@@ -124,6 +124,28 @@ file_inode() {
 EXPECTED_WELCOME_NOTE_SHA256="f9f6b278a9732f0dbcc0969414f34d7365942ce8e8aea705775a5e933b8e7475"
 EXPECTED_VENUE_HISTORY_SHA256="3afe8aea8f84e6fff4da67c0f48d14b7956c6630ff06756c2ea2bb6180eec7a5"
 
+# Module 04's 12 door-count fixtures, one embedded sha256 per date. A `case`
+# statement, not `declare -A` -- see the Module 01/02 comment below on why:
+# stock macOS bash 3.2 has no associative arrays, and `declare -A` crashes
+# the whole script there with no RESULT line at all.
+door_count_expected_sha256() {
+  case "$1" in
+    2026-08-01) echo "9f3a8b0744369ca0b6f7a5769d390ac4a6b72a34ad51a3a045132b5ed8487d05" ;;
+    2026-08-02) echo "a183c3cd769d0b13246e3e514b50cb109843589f2cd7941a28e25abeade1eb54" ;;
+    2026-08-03) echo "9d0ca4e2d2baf943d302bcc99405155781a8693844354566f98458b1ccf6009d" ;;
+    2026-08-04) echo "3e0793a8e27e75cdc0620846373717e3e0b475ef224f1a068e4bc941fa4a6382" ;;
+    2026-08-05) echo "6ed3288ba4c4903931664d796e3525baf5366ec6b2c39c5dde6bdfb758ed0176" ;;
+    2026-08-06) echo "fa474fc1e93a53e7c03ce55cfb4f8681f3f14f0a7aa580ab930997ff64334482" ;;
+    2026-08-07) echo "4a5f01d395b6ebb6fb2913b7832a35f9c0c302cef096f2c13389e3c4e4161866" ;;
+    2026-08-08) echo "1b89b5f6799ea7775b7c35cbe5a87f7e15481f33a78ebf67fd401bf257028730" ;;
+    2026-08-09) echo "f8b9e67bfd801f5c1ad79191e1306704c3b9d33f77e2739aabd6ef761b0af800" ;;
+    2026-08-10) echo "978a2a71906bb53d2079865e2ce3cb6bc3363245a2fbdfcf4a171c8cf410eff5" ;;
+    2026-08-11) echo "6e74f02629bbd62f12222ca010716891e23bed2f9c8d921ee5cb2f88463f09f7" ;;
+    2026-08-12) echo "c0f0ac145ff52a136daa425d148b70c757fd1989f976635cc07f2413f4dc100c" ;;
+    *) echo "" ;;
+  esac
+}
+
 echo "-- Wade In required checklist: Module $MODULE ------------------------"
 echo ""
 
@@ -414,6 +436,193 @@ case "$MODULE" in
       fi
     else
       check "02-meet/answers.txt has all three reflection answers, in your own words" fail
+    fi
+    ;;
+  04)
+    # 1. 04-scripts/ itself is a real directory, not a symlink standing in
+    #    for one -- same convention as Module 02's 02-meet/ check: a
+    #    symlinked parent would let the required output actually live
+    #    outside the sandbox while still passing every downstream check.
+    EXPECTED_04_SCRIPTS="$ROOT/04-scripts"
+    SCRIPTS_DIR_OK=true
+    if [[ -e "$EXPECTED_04_SCRIPTS" ]]; then
+      REAL_04_SCRIPTS="$(cd "$EXPECTED_04_SCRIPTS" 2>/dev/null && pwd -P || echo "")"
+      if [[ "$REAL_04_SCRIPTS" != "$EXPECTED_04_SCRIPTS" ]]; then
+        SCRIPTS_DIR_OK=false
+      fi
+    fi
+    if [[ "$SCRIPTS_DIR_OK" == true && -d "$EXPECTED_04_SCRIPTS" ]]; then
+      check "04-scripts/ directory exists (not a symlink)" pass
+    else
+      check "04-scripts/ directory exists (not a symlink)" fail
+      SCRIPTS_DIR_OK=false
+    fi
+
+    # 2. 04-scripts/door-report.txt exists for real -- not a symlink, and not
+    #    a hard link either (same discipline as Module 02's summary.txt: this
+    #    file is learner/Claude-Code-authored, not copied from a fixture, so
+    #    any link count above 1 means it's sharing bytes with some other path
+    #    rather than having been written here).
+    REPORT="$ROOT/04-scripts/door-report.txt"
+    REPORT_LINK_COUNT="$(stat -f '%l' "$REPORT" 2>/dev/null || stat -c '%h' "$REPORT" 2>/dev/null || echo "1")"
+    REPORT_OK=false
+    if [[ "$SCRIPTS_DIR_OK" == false ]]; then
+      check "04-scripts/door-report.txt exists and is non-empty (04-scripts/ isn't set up as a real directory yet)" fail
+    elif [[ -L "$REPORT" ]]; then
+      check "04-scripts/door-report.txt exists and is non-empty (found a symlink, not a real file)" fail
+    elif [[ -f "$REPORT" && "$REPORT_LINK_COUNT" != "1" ]]; then
+      check "04-scripts/door-report.txt exists and is non-empty (found a hard link, not an independently-written file)" fail
+    elif [[ -s "$REPORT" ]]; then
+      check "04-scripts/door-report.txt exists and is non-empty" pass
+      REPORT_OK=true
+    else
+      check "04-scripts/door-report.txt exists and is non-empty" fail
+    fi
+
+    # 3. All 12 door-count fixtures are unmodified -- checksum-verified
+    #    against the embedded, pinned hashes above (never a checksum
+    #    computed from the live fixture at run time, which would let a
+    #    tampered fixture silently become its own new "pristine" reference --
+    #    the same class of bypass Module 01 and 02's fixture checks already
+    #    guard against). Recomputing TOTAL/BEST/WORST below only happens if
+    #    every fixture passes here; a single tampered or missing fixture
+    #    fails this check AND every downstream figure check, with a "contact
+    #    the workshop" message, rather than quietly computing a wrong answer
+    #    from bad input.
+    DOOR_COUNT_DATES=(2026-08-01 2026-08-02 2026-08-03 2026-08-04 2026-08-05 2026-08-06 2026-08-07 2026-08-08 2026-08-09 2026-08-10 2026-08-11 2026-08-12)
+    FIXTURES_OK=true
+    if [[ "$CHECKSUM_TOOL_AVAILABLE" == false ]]; then
+      check "all 12 door-count fixtures unmodified (couldn't verify: no checksum tool found on this system - contact the workshop)" fail
+      FIXTURES_OK=false
+    else
+      BAD_FIXTURES=()
+      for d in "${DOOR_COUNT_DATES[@]}"; do
+        FPATH="$ROOT/fixtures/door-count-$d.txt"
+        EXPECTED_SUM="$(door_count_expected_sha256 "$d")"
+        ACTUAL_SUM="$(file_checksum "$FPATH" 2>/dev/null || echo "MISSING_FIXTURE")"
+        if [[ "$ACTUAL_SUM" != "$EXPECTED_SUM" ]]; then
+          BAD_FIXTURES+=("door-count-$d.txt")
+        fi
+      done
+      if [[ "${#BAD_FIXTURES[@]}" -eq 0 ]]; then
+        check "all 12 door-count fixtures unmodified (checksum verified)" pass
+      else
+        check "all 12 door-count fixtures unmodified (contact the workshop, not your own mistake - affected: ${BAD_FIXTURES[*]})" fail
+        FIXTURES_OK=false
+      fi
+    fi
+
+    # Recompute the monthly total, best night, and worst night independently
+    # from the pristine fixtures -- never from door-report.txt itself, and
+    # never a hardcoded answer key -- so a wrong script produces a wrong
+    # report and fails here, and this stays correct even if a future fixture
+    # revision changes the real figures.
+    TOTAL_EXPECTED=0
+    BEST_DATE=""; BEST_COUNT=-1
+    WORST_DATE=""; WORST_COUNT=-1
+    if [[ "$FIXTURES_OK" == true ]]; then
+      for d in "${DOOR_COUNT_DATES[@]}"; do
+        FPATH="$ROOT/fixtures/door-count-$d.txt"
+        LINE="$(grep -m1 '^Count:' "$FPATH" 2>/dev/null || true)"
+        N="$(echo "$LINE" | sed 's/^Count:[[:space:]]*//' | sed 's/[[:space:]]*$//')"
+        TOTAL_EXPECTED=$((TOTAL_EXPECTED + N))
+        if [[ "$N" -gt "$BEST_COUNT" ]]; then BEST_COUNT="$N"; BEST_DATE="$d"; fi
+        if [[ "$WORST_COUNT" -eq -1 || "$N" -lt "$WORST_COUNT" ]]; then WORST_COUNT="$N"; WORST_DATE="$d"; fi
+      done
+    fi
+
+    # Helper: read one labeled value out of door-report.txt, exact-trimmed,
+    # no substring or token matching involved -- door-report.txt is a
+    # structured labeled file the learner's script writes (format given
+    # verbatim in the module page), not free prose, so an exact per-label
+    # match is the right tool here and sidesteps the substring-match bug
+    # class Module 02's own review found in its free-text summary check.
+    read_report_label() {
+      local label="$1"
+      [[ "$REPORT_OK" == true ]] || { echo ""; return; }
+      local line
+      line="$(grep -m1 "^$label" "$REPORT" 2>/dev/null || true)"
+      echo "$line" | sed "s/^$label//" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'
+    }
+
+    # 4. The exact monthly total.
+    if [[ "$REPORT_OK" == true && "$FIXTURES_OK" == true ]]; then
+      ACTUAL_TOTAL="$(read_report_label 'TOTAL:')"
+      if [[ "$ACTUAL_TOTAL" == "$TOTAL_EXPECTED" ]]; then
+        check "door-report.txt has the exact monthly total ($TOTAL_EXPECTED)" pass
+      else
+        check "door-report.txt has the exact monthly total (expected $TOTAL_EXPECTED, found '${ACTUAL_TOTAL:-nothing}')" fail
+      fi
+    else
+      check "door-report.txt has the exact monthly total (contact the workshop, not your own mistake)" fail
+    fi
+
+    # 5. The exact best night -- date AND count together, since a report
+    #    with the right count on the wrong date (or vice versa) isn't
+    #    actually correct.
+    if [[ "$REPORT_OK" == true && "$FIXTURES_OK" == true ]]; then
+      ACTUAL_BEST_DATE="$(read_report_label 'BEST_NIGHT_DATE:')"
+      ACTUAL_BEST_COUNT="$(read_report_label 'BEST_NIGHT_COUNT:')"
+      if [[ "$ACTUAL_BEST_DATE" == "$BEST_DATE" && "$ACTUAL_BEST_COUNT" == "$BEST_COUNT" ]]; then
+        check "door-report.txt has the exact best night ($BEST_DATE, $BEST_COUNT)" pass
+      else
+        check "door-report.txt has the exact best night (expected $BEST_DATE / $BEST_COUNT, found '${ACTUAL_BEST_DATE:-nothing}' / '${ACTUAL_BEST_COUNT:-nothing}')" fail
+      fi
+    else
+      check "door-report.txt has the exact best night (contact the workshop, not your own mistake)" fail
+    fi
+
+    # 6. The exact worst night, same discipline as the best night above.
+    if [[ "$REPORT_OK" == true && "$FIXTURES_OK" == true ]]; then
+      ACTUAL_WORST_DATE="$(read_report_label 'WORST_NIGHT_DATE:')"
+      ACTUAL_WORST_COUNT="$(read_report_label 'WORST_NIGHT_COUNT:')"
+      if [[ "$ACTUAL_WORST_DATE" == "$WORST_DATE" && "$ACTUAL_WORST_COUNT" == "$WORST_COUNT" ]]; then
+        check "door-report.txt has the exact worst night ($WORST_DATE, $WORST_COUNT)" pass
+      else
+        check "door-report.txt has the exact worst night (expected $WORST_DATE / $WORST_COUNT, found '${ACTUAL_WORST_DATE:-nothing}' / '${ACTUAL_WORST_COUNT:-nothing}')" fail
+      fi
+    else
+      check "door-report.txt has the exact worst night (contact the workshop, not your own mistake)" fail
+    fi
+
+    # 7. Own-words answers file: same discipline as Modules 01 and 02 --
+    #    presence-checked for genuine content, rejecting the literal
+    #    placeholder text from the module page itself, and rejecting a
+    #    symlink or hard link standing in for a real file.
+    ANSWERS04="$ROOT/04-scripts/answers.txt"
+    ANSWERS04_LINK_COUNT="$(stat -f '%l' "$ANSWERS04" 2>/dev/null || stat -c '%h' "$ANSWERS04" 2>/dev/null || echo "1")"
+    PLACEHOLDER_PLAN04="<did you ask Claude Code for a plan before it wrote the script - what did you ask for?>"
+    PLACEHOLDER_CHECKED04="<which night's figure did you verify by hand against its raw fixture file, and what did you find?>"
+    PLACEHOLDER_NEXT04="<what would you do differently next time you ask Claude Code to write and run a script?>"
+    if [[ "$SCRIPTS_DIR_OK" == false ]]; then
+      check "04-scripts/answers.txt has all three reflection answers, in your own words (04-scripts/ isn't set up as a real directory yet)" fail
+    elif [[ -L "$ANSWERS04" ]]; then
+      check "04-scripts/answers.txt has all three reflection answers, in your own words (found a symlink, not a real file)" fail
+    elif [[ -f "$ANSWERS04" && "$ANSWERS04_LINK_COUNT" != "1" ]]; then
+      check "04-scripts/answers.txt has all three reflection answers, in your own words (found a hard link, not an independently-written file)" fail
+    elif [[ -f "$ANSWERS04" ]]; then
+      MISSING_LABELS=()
+      # Bash-3.2-safe case statement, not an associative array -- see the
+      # matching comment on Module 01/02's identical pattern, above.
+      for label in "PLAN_FIRST:" "CHECKED_BY_HAND:" "WHAT_NEXT_TIME:"; do
+        case "$label" in
+          "PLAN_FIRST:") EXPECTED_PLACEHOLDER="$PLACEHOLDER_PLAN04" ;;
+          "CHECKED_BY_HAND:") EXPECTED_PLACEHOLDER="$PLACEHOLDER_CHECKED04" ;;
+          "WHAT_NEXT_TIME:") EXPECTED_PLACEHOLDER="$PLACEHOLDER_NEXT04" ;;
+        esac
+        LINE="$(grep -m1 "^$label" "$ANSWERS04" 2>/dev/null || true)"
+        VALUE="$(echo "$LINE" | sed "s/^$label//" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+        if [[ -z "$VALUE" || "$VALUE" == "$EXPECTED_PLACEHOLDER" ]]; then
+          MISSING_LABELS+=("$label")
+        fi
+      done
+      if [[ "${#MISSING_LABELS[@]}" -eq 0 ]]; then
+        check "04-scripts/answers.txt has all three reflection answers, in your own words" pass
+      else
+        check "04-scripts/answers.txt has all three reflection answers, in your own words (still needed: ${MISSING_LABELS[*]})" fail
+      fi
+    else
+      check "04-scripts/answers.txt has all three reflection answers, in your own words" fail
     fi
     ;;
   *)
