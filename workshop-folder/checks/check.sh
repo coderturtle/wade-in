@@ -123,6 +123,55 @@ file_inode() {
 # changes -- never let it silently drift from what's actually on disk.
 EXPECTED_WELCOME_NOTE_SHA256="f9f6b278a9732f0dbcc0969414f34d7365942ce8e8aea705775a5e933b8e7475"
 EXPECTED_VENUE_HISTORY_SHA256="3afe8aea8f84e6fff4da67c0f48d14b7956c6630ff06756c2ea2bb6180eec7a5"
+EXPECTED_STANDIN_NOTE_SHA256="3d322629bbf07b27385c321bbc9e7a5a01945555676d2f9a72d4393ff5676712"
+EXPECTED_STANDIN_PACKING_SHA256="f1834bcffc2c2eb9c4ec5b37de0aba444f417560b2c0f0d45182cb74b78c5c81"
+EXPECTED_STANDIN_RECIPE_SHA256="fba4148aca9e6cd0caa7e7433ad160300d481b559bc57744c894a77c4b45daf7"
+
+# --- Module 09 helper functions --------------------------------------------
+# Module 09 (Off the Clock) is the one module whose graded artifacts live in
+# TWO places: this workshop folder's own 09-real-work/ (the checker's
+# bookkeeping -- manifests, the quiz answer, the safety plan) and a real
+# folder OUTSIDE the workshop folder entirely, at $HOME/wade-in-real-folder
+# (the learner's own real-or-stand-in files and their backup). Both halves
+# get real, hardened checks below -- never a display of any file's content.
+
+# real_folder_path: the one fixed, documented location for the learner's
+# real-or-stand-in folder. A fixed convention (not a learner-supplied path)
+# keeps this checkable without ever asking the learner to type a path into
+# an answers file that this script would then have to trust unverified.
+real_folder_path() {
+  printf '%s/wade-in-real-folder' "${HOME:-$ROOT}"
+}
+
+# parse_manifest_names FILE: prints one candidate filename per line, trimmed,
+# skipping blank lines, a literal "backup" entry (the backup/ folder itself
+# routinely shows up in a plain `ls` of the real folder, since the taught
+# ritual order is copy in -> back up -> manifest), and dotfiles (OS-noise
+# like .DS_Store, not something the learner deliberately copied in).
+parse_manifest_names() {
+  local manifest_file="$1"
+  [[ -f "$manifest_file" ]] || return 0
+  local line trimmed
+  while IFS= read -r line; do
+    trimmed="$(printf '%s' "$line" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+    [[ -z "$trimmed" ]] && continue
+    [[ "$trimmed" == "backup" ]] && continue
+    case "$trimmed" in
+      .*) continue ;;
+    esac
+    printf '%s\n' "$trimmed"
+  done < "$manifest_file"
+}
+
+# pin_get TAG PINFILE: reads a single tagged value (tab-separated) out of the
+# checker's own state file. A case statement elsewhere in this script already
+# explains why this file never uses `declare -A` -- this is the same
+# discipline: a flat, tab-separated, grep/awk-readable file instead.
+pin_get() {
+  local tag="$1" pinfile="$2"
+  [[ -f "$pinfile" ]] || return 0
+  awk -F'\t' -v t="$tag" '$1==t{v=$2} END{if (v!="") print v}' "$pinfile" 2>/dev/null
+}
 
 echo "-- Wade In required checklist: Module $MODULE ------------------------"
 echo ""
@@ -414,6 +463,360 @@ case "$MODULE" in
       fi
     else
       check "02-meet/answers.txt has all three reflection answers, in your own words" fail
+    fi
+    ;;
+  09)
+    # Module 09 (Off the Clock) is the first and only module that leaves the
+    # workshop sandbox. Its artifacts live in two places: this workshop
+    # folder's own 09-real-work/ (the checker's bookkeeping - manifests, the
+    # safety quiz answer, the safety plan) and a real folder OUTSIDE the
+    # workshop folder entirely, at $HOME/wade-in-real-folder (the learner's
+    # own real-or-stand-in files and their backup). Hard privacy rule,
+    # audited directly, not just intended: this case block computes
+    # checksums (which necessarily read file bytes) but never prints,
+    # extracts, or otherwise displays any file's actual content anywhere -
+    # every message below names files, checksums, and counts only.
+    STATE_DIR="$ROOT/09-real-work"
+    REAL_FOLDER="$(real_folder_path)"
+    REAL_BACKUP="$REAL_FOLDER/backup"
+    BEFORE_MANIFEST="$STATE_DIR/before-manifest.txt"
+    AFTER_MANIFEST="$STATE_DIR/after-manifest.txt"
+    QUIZ_FILE="$STATE_DIR/safety-quiz-answers.txt"
+    PLAN_FILE="$STATE_DIR/safety-plan.txt"
+    PIN_FILE="$STATE_DIR/.checker-state"
+
+    # 1. Workshop-provided stand-in fixtures are present and intact - same
+    #    fixture-integrity discipline as Modules 01/02's own fixtures, so a
+    #    corrupted download is diagnosed as a workshop problem, not a
+    #    learner mistake. Runs regardless of whether the learner actually
+    #    used the stand-ins or their own real files - this verifies the
+    #    DOWNLOAD, not the learner's choice.
+    STANDIN_DIR="$ROOT/fixtures/stand-in-files"
+    STANDIN_OK=true
+    STANDIN_PROBLEM=""
+    if [[ "$CHECKSUM_TOOL_AVAILABLE" == false ]]; then
+      STANDIN_OK=false
+      STANDIN_PROBLEM="no checksum tool found on this system - contact the workshop"
+    else
+      for pair in "note-to-self.txt:$EXPECTED_STANDIN_NOTE_SHA256" \
+                  "weekend-packing-list.txt:$EXPECTED_STANDIN_PACKING_SHA256" \
+                  "recipe-notes.txt:$EXPECTED_STANDIN_RECIPE_SHA256"; do
+        sname="${pair%%:*}"
+        sexpected="${pair##*:}"
+        spath="$STANDIN_DIR/$sname"
+        if [[ -L "$spath" || ! -f "$spath" ]]; then
+          STANDIN_OK=false
+          STANDIN_PROBLEM="$sname is missing (contact the workshop)"
+          continue
+        fi
+        ssum="$(file_checksum "$spath" 2>/dev/null || echo "")"
+        if [[ "$ssum" != "$sexpected" ]]; then
+          STANDIN_OK=false
+          STANDIN_PROBLEM="$sname doesn't match its expected content (contact the workshop, not your own mistake)"
+        fi
+      done
+    fi
+    if [[ "$STANDIN_OK" == true ]]; then
+      check "workshop stand-in files are present and intact" pass
+    else
+      check "workshop stand-in files are present and intact ($STANDIN_PROBLEM)" fail
+    fi
+
+    # 2. The real-or-stand-in folder exists, is a REAL directory (not a
+    #    symlink), and is genuinely outside this workshop folder - not just
+    #    a differently-named folder still living inside it, and not a
+    #    symlink pointing back in. This is the one module where "outside the
+    #    sandbox" is the whole point; a folder that only looks outside would
+    #    quietly defeat the entire exercise.
+    REAL_FOLDER_OK=true
+    REAL_FOLDER_PROBLEM=""
+    if [[ -L "$REAL_FOLDER" ]]; then
+      REAL_FOLDER_OK=false
+      REAL_FOLDER_PROBLEM="found a symlink at $REAL_FOLDER, not a real folder - use mkdir, not ln -s"
+    elif [[ ! -d "$REAL_FOLDER" ]]; then
+      REAL_FOLDER_OK=false
+      REAL_FOLDER_PROBLEM="no folder found at $REAL_FOLDER yet"
+    else
+      REAL_FOLDER_RESOLVED="$(cd "$REAL_FOLDER" 2>/dev/null && pwd -P || echo "")"
+      if [[ -z "$REAL_FOLDER_RESOLVED" ]]; then
+        REAL_FOLDER_OK=false
+        REAL_FOLDER_PROBLEM="couldn't resolve $REAL_FOLDER"
+      elif [[ "$REAL_FOLDER_RESOLVED" == "$ROOT" || "$REAL_FOLDER_RESOLVED" == "$ROOT"/* ]]; then
+        REAL_FOLDER_OK=false
+        REAL_FOLDER_PROBLEM="this folder is still inside the workshop folder - it needs to be outside it"
+      fi
+    fi
+    if [[ "$REAL_FOLDER_OK" == true ]]; then
+      check "a real folder exists outside the workshop folder, at $REAL_FOLDER" pass
+    else
+      check "a real folder exists outside the workshop folder, at $REAL_FOLDER ($REAL_FOLDER_PROBLEM)" fail
+    fi
+
+    # Everything below depends on being able to compute checksums at all.
+    # Guard it as one block: with no checksum tool, computing "NO_CHECKSUM_TOOL"
+    # on both sides of a comparison would otherwise silently "match" and
+    # produce a false PASS - the exact bypass Module 01's own checksum-tool
+    # guard was built to avoid, reproduced here for the same reason.
+    if [[ "$CHECKSUM_TOOL_AVAILABLE" == false ]]; then
+      check "before-manifest.txt exists, lists real files, and is timestamped by the checker (no checksum tool found on this system - contact the workshop)" fail
+      check "after-manifest.txt exists, is non-empty, and is timestamped by the checker (no checksum tool found on this system - contact the workshop)" fail
+      check "before-manifest.txt was recorded before after-manifest.txt (no checksum tool found on this system - contact the workshop)" fail
+      check "backup/ exists and contains exactly the files listed in your before-manifest (no checksum tool found on this system - contact the workshop)" fail
+      check "every file in backup/ is byte-identical to the original (checked by checksum, recorded when before-manifest.txt was first pinned) (no checksum tool found on this system - contact the workshop)" fail
+      BEFORE_OK=false
+    else
+
+    # 3. before-manifest.txt: read, and pin the checker's own record of it
+    #    the first time this exact content is seen. Pinning captures BOTH a
+    #    timestamp (this script's own wall clock, never trusted from file
+    #    mtimes or anything the learner could set by hand) AND a sha256 of
+    #    every real file the manifest names, at that moment - the "originals'
+    #    checksums recorded at backup time" the backup/ check below verifies
+    #    against. If the manifest's content ever changes (a legitimate redo),
+    #    the OLD pin - including any after-manifest stamp - is discarded and
+    #    replaced, since a changed "before" invalidates whatever "after" was
+    #    compared against it.
+    BEFORE_OK=false
+    BEFORE_PROBLEM="before-manifest.txt not found yet"
+    if [[ -L "$BEFORE_MANIFEST" ]]; then
+      BEFORE_PROBLEM="found a symlink, not a real file - use a real redirect (ls ... > before-manifest.txt)"
+    elif [[ -f "$BEFORE_MANIFEST" && -s "$BEFORE_MANIFEST" ]]; then
+      BEFORE_HASH_NOW="$(file_checksum "$BEFORE_MANIFEST" 2>/dev/null || echo "")"
+      STORED_BEFORE_HASH="$(pin_get "BEFORE_STAMP_HASH" "$PIN_FILE")"
+      if [[ -n "$BEFORE_HASH_NOW" && "$BEFORE_HASH_NOW" == "$STORED_BEFORE_HASH" ]]; then
+        # Already pinned for this exact content - nothing to redo.
+        BEFORE_OK=true
+      else
+        NAMES="$(parse_manifest_names "$BEFORE_MANIFEST")"
+        if [[ -z "$NAMES" ]]; then
+          BEFORE_PROBLEM="before-manifest.txt doesn't list any real files - run it (ls $REAL_FOLDER > ...) after copying files in"
+        elif [[ "$REAL_FOLDER_OK" != true ]]; then
+          BEFORE_PROBLEM="can't verify the files it lists until the real folder itself exists"
+        else
+          PIN_ALL_OK=true
+          PIN_BAD_NAME=""
+          ORIGINAL_LINES=""
+          while IFS= read -r nm; do
+            [[ -z "$nm" ]] && continue
+            fpath="$REAL_FOLDER/$nm"
+            if [[ -L "$fpath" ]]; then
+              PIN_ALL_OK=false; PIN_BAD_NAME="$nm (a symlink, not a real file)"; continue
+            fi
+            if [[ ! -f "$fpath" ]]; then
+              PIN_ALL_OK=false; PIN_BAD_NAME="$nm (not found in your real folder)"; continue
+            fi
+            nm_sum="$(file_checksum "$fpath" 2>/dev/null || echo "")"
+            ORIGINAL_LINES="${ORIGINAL_LINES}ORIGINAL"$'\t'"${nm}"$'\t'"${nm_sum}"$'\n'
+          done <<< "$NAMES"
+          if [[ "$PIN_ALL_OK" == true ]]; then
+            NOW_EPOCH="$(date +%s 2>/dev/null || echo 0)"
+            {
+              printf 'BEFORE_STAMP_HASH\t%s\n' "$BEFORE_HASH_NOW"
+              printf 'BEFORE_STAMP_EPOCH\t%s\n' "$NOW_EPOCH"
+              printf '%s' "$ORIGINAL_LINES"
+            } > "$PIN_FILE" 2>/dev/null
+            BEFORE_OK=true
+          else
+            BEFORE_PROBLEM="before-manifest.txt lists $PIN_BAD_NAME"
+          fi
+        fi
+      fi
+    elif [[ -f "$BEFORE_MANIFEST" ]]; then
+      BEFORE_PROBLEM="before-manifest.txt exists but is empty"
+    fi
+    if [[ "$BEFORE_OK" == true ]]; then
+      check "before-manifest.txt exists, lists real files, and is timestamped by the checker" pass
+    else
+      check "before-manifest.txt exists, lists real files, and is timestamped by the checker ($BEFORE_PROBLEM)" fail
+    fi
+
+    # 4. after-manifest.txt: same non-empty/symlink checks, then its own
+    #    independent checker-written stamp - but only once a valid
+    #    before-manifest is already pinned. That ordering requirement is
+    #    structural, not just a timestamp comparison: this script never
+    #    stamps an after-manifest until a before-manifest has already been
+    #    stamped, so "before" being chronologically before "after" is
+    #    guaranteed by construction, not merely asserted by comparing two
+    #    numbers a learner could otherwise have influenced.
+    AFTER_OK=false
+    AFTER_PROBLEM="after-manifest.txt not found yet"
+    BEFORE_PINNED_HASH="$(pin_get "BEFORE_STAMP_HASH" "$PIN_FILE")"
+    if [[ -L "$AFTER_MANIFEST" ]]; then
+      AFTER_PROBLEM="found a symlink, not a real file - use a real redirect (ls ... > after-manifest.txt)"
+    elif [[ -f "$AFTER_MANIFEST" && -s "$AFTER_MANIFEST" ]]; then
+      if [[ -z "$BEFORE_PINNED_HASH" ]]; then
+        AFTER_PROBLEM="waiting on a valid before-manifest.txt first (see above)"
+      else
+        AFTER_HASH_NOW="$(file_checksum "$AFTER_MANIFEST" 2>/dev/null || echo "")"
+        STORED_AFTER_HASH="$(pin_get "AFTER_STAMP_HASH" "$PIN_FILE")"
+        if [[ -n "$AFTER_HASH_NOW" && "$AFTER_HASH_NOW" == "$STORED_AFTER_HASH" ]]; then
+          AFTER_OK=true
+        else
+          NOW_EPOCH2="$(date +%s 2>/dev/null || echo 0)"
+          TMP_PIN="${PIN_FILE}.tmp$$"
+          grep -v -e $'^AFTER_STAMP_HASH\t' -e $'^AFTER_STAMP_EPOCH\t' "$PIN_FILE" > "$TMP_PIN" 2>/dev/null
+          {
+            cat "$TMP_PIN" 2>/dev/null
+            printf 'AFTER_STAMP_HASH\t%s\n' "$AFTER_HASH_NOW"
+            printf 'AFTER_STAMP_EPOCH\t%s\n' "$NOW_EPOCH2"
+          } > "$PIN_FILE" 2>/dev/null
+          rm -f "$TMP_PIN" 2>/dev/null
+          AFTER_OK=true
+        fi
+      fi
+    elif [[ -f "$AFTER_MANIFEST" ]]; then
+      AFTER_PROBLEM="after-manifest.txt exists but is empty"
+    fi
+    if [[ "$AFTER_OK" == true ]]; then
+      check "after-manifest.txt exists, is non-empty, and is timestamped by the checker" pass
+    else
+      check "after-manifest.txt exists, is non-empty, and is timestamped by the checker ($AFTER_PROBLEM)" fail
+    fi
+
+    # 5. Chronological order: before-manifest's stamp must be no later than
+    #    after-manifest's stamp. `date +%s` is second-resolution (the most
+    #    this script can portably rely on across macOS and Linux without a
+    #    nanosecond-capable `date` everywhere), so this compares with <=, not
+    #    strict <, to avoid a false FAIL on two stamps written within the
+    #    same second. The real ordering guarantee is the structural one
+    #    above (after can never be stamped before before is) - this
+    #    comparison is defense in depth on top of it, not the only thing
+    #    standing between a learner and a fabricated order.
+    BEFORE_EPOCH="$(pin_get "BEFORE_STAMP_EPOCH" "$PIN_FILE")"
+    AFTER_EPOCH="$(pin_get "AFTER_STAMP_EPOCH" "$PIN_FILE")"
+    if [[ "$BEFORE_OK" == true && "$AFTER_OK" == true && -n "$BEFORE_EPOCH" && -n "$AFTER_EPOCH" && "$BEFORE_EPOCH" -le "$AFTER_EPOCH" ]]; then
+      check "before-manifest.txt was recorded before after-manifest.txt" pass
+    else
+      check "before-manifest.txt was recorded before after-manifest.txt" fail
+    fi
+
+    # 6 & 7. backup/: filenames must match the pre-run (before-)manifest, AND
+    #    each backed-up file's checksum must match the original's checksum as
+    #    recorded when before-manifest was first pinned. Filename match alone
+    #    would pass an empty or corrupted backup as long as it had the right
+    #    names sitting in it with wrong (or no) bytes - the checksum pass is
+    #    what actually catches that.
+    BACKUP_NAMES_OK=false
+    BACKUP_NAMES_PROBLEM="can't check backup/ until before-manifest.txt is properly pinned (see above)"
+    PINNED_NAMES=""
+    if [[ "$BEFORE_OK" == true ]]; then
+      PINNED_NAMES="$(awk -F'\t' '$1=="ORIGINAL"{print $2}' "$PIN_FILE" 2>/dev/null)"
+      if [[ -L "$REAL_BACKUP" ]]; then
+        BACKUP_NAMES_PROBLEM="found a symlink at backup/, not a real folder - use mkdir, not ln -s"
+      elif [[ ! -d "$REAL_BACKUP" ]]; then
+        BACKUP_NAMES_PROBLEM="no backup/ folder found yet at $REAL_BACKUP"
+      else
+        BACKUP_ACTUAL_NAMES="$(find "$REAL_BACKUP" -maxdepth 1 -type f ! -name '.*' -exec basename {} \; 2>/dev/null | sort)"
+        PINNED_NAMES_SORTED="$(printf '%s\n' "$PINNED_NAMES" | sort)"
+        if [[ "$BACKUP_ACTUAL_NAMES" == "$PINNED_NAMES_SORTED" ]]; then
+          BACKUP_NAMES_OK=true
+        else
+          BACKUP_NAMES_PROBLEM="backup/ doesn't contain exactly the files your before-manifest lists (missing, extra, renamed, or symlinked files)"
+        fi
+      fi
+    fi
+    if [[ "$BACKUP_NAMES_OK" == true ]]; then
+      check "backup/ exists and contains exactly the files listed in your before-manifest" pass
+    else
+      check "backup/ exists and contains exactly the files listed in your before-manifest ($BACKUP_NAMES_PROBLEM)" fail
+    fi
+
+    BACKUP_SUMS_OK=false
+    BACKUP_SUMS_PROBLEM="can't verify backup checksums until the check above passes"
+    if [[ "$BACKUP_NAMES_OK" == true ]]; then
+      BACKUP_SUMS_OK=true
+      BACKUP_SUMS_PROBLEM=""
+      while IFS=$'\t' read -r tag bname bsum; do
+        [[ "$tag" == "ORIGINAL" ]] || continue
+        bfile="$REAL_BACKUP/$bname"
+        ofile="$REAL_FOLDER/$bname"
+        if [[ -L "$bfile" ]]; then
+          BACKUP_SUMS_OK=false; BACKUP_SUMS_PROBLEM="$bname in backup/ is a symlink, not a real copy"; continue
+        fi
+        b_inode="$(file_inode "$bfile")"
+        o_inode="$(file_inode "$ofile")"
+        if [[ "$b_inode" != "NO_STAT_TOOL" && "$b_inode" == "$o_inode" ]]; then
+          BACKUP_SUMS_OK=false; BACKUP_SUMS_PROBLEM="$bname in backup/ is a hard link to the original, not an independent copy"; continue
+        fi
+        actual_sum="$(file_checksum "$bfile" 2>/dev/null || echo "")"
+        if [[ -z "$actual_sum" || "$actual_sum" != "$bsum" ]]; then
+          BACKUP_SUMS_OK=false; BACKUP_SUMS_PROBLEM="$bname in backup/ doesn't match the original's checksum (empty or corrupted backup)"
+        fi
+      done < "$PIN_FILE"
+    fi
+    if [[ "$BACKUP_SUMS_OK" == true ]]; then
+      check "every file in backup/ is byte-identical to the original (checked by checksum, recorded when before-manifest.txt was first pinned)" pass
+    else
+      check "every file in backup/ is byte-identical to the original (checked by checksum, recorded when before-manifest.txt was first pinned) ($BACKUP_SUMS_PROBLEM)" fail
+    fi
+    fi
+
+    # 8. Closed-set safety exercise: six numbered situations are described on
+    #    this module's own page; exactly three are safe. The answer file
+    #    names those three, matched exactly against the published key below -
+    #    this key follows directly from the rule this module actually
+    #    teaches (stay inside the one real folder you deliberately set up for
+    #    this, and never let Claude Code touch your only backup), not an
+    #    arbitrary judgment call.
+    QUIZ_OK=false
+    QUIZ_PROBLEM="safety-quiz-answers.txt not found yet"
+    if [[ -L "$QUIZ_FILE" ]]; then
+      QUIZ_PROBLEM="found a symlink, not a real file"
+    elif [[ -f "$QUIZ_FILE" && -s "$QUIZ_FILE" ]]; then
+      QUIZ_LINE="$(grep -m1 '^SAFE_SITUATIONS:' "$QUIZ_FILE" 2>/dev/null || true)"
+      QUIZ_VALUE="$(printf '%s' "$QUIZ_LINE" | sed 's/^SAFE_SITUATIONS:[[:space:]]*//')"
+      QUIZ_NUMS="$(printf '%s' "$QUIZ_VALUE" | grep -oE '[0-9]+' | sort -n)"
+      QUIZ_COUNT="$(printf '%s\n' "$QUIZ_NUMS" | grep -c . || true)"
+      QUIZ_UNIQUE_COUNT="$(printf '%s\n' "$QUIZ_NUMS" | sort -nu | grep -c . || true)"
+      EXPECTED_NUMS="$(printf '2\n4\n6\n')"
+      if [[ -z "$QUIZ_VALUE" ]]; then
+        QUIZ_PROBLEM="the SAFE_SITUATIONS: line is empty"
+      elif [[ "$QUIZ_COUNT" -ne 3 || "$QUIZ_UNIQUE_COUNT" -ne 3 ]]; then
+        QUIZ_PROBLEM="pick exactly 3 distinct situation numbers"
+      elif [[ "$QUIZ_NUMS" == "$EXPECTED_NUMS" ]]; then
+        QUIZ_OK=true
+      else
+        QUIZ_PROBLEM="that's not the right set of 3 - re-read the six situations against the rule this module teaches"
+      fi
+    elif [[ -f "$QUIZ_FILE" ]]; then
+      QUIZ_PROBLEM="safety-quiz-answers.txt exists but is empty"
+    fi
+    if [[ "$QUIZ_OK" == true ]]; then
+      check "safety-quiz-answers.txt selects exactly the 3 safe situations" pass
+    else
+      check "safety-quiz-answers.txt selects exactly the 3 safe situations ($QUIZ_PROBLEM)" fail
+    fi
+
+    # 9. Own-words safety plan: same presence-and-genuine-content discipline
+    #    as Modules 01/02's answers files, not AI-graded (see this module's
+    #    own text for why - the safety plan's substance is a self-audit, not
+    #    something with a single correct wording).
+    PLACEHOLDER_NEVER="<what you would never point Claude Code at, and why>"
+    PLACEHOLDER_UNDO="<what your undo story is - how you'd actually recover if something went wrong>"
+    PLACEHOLDER_LINE="<where your own line between sandbox and real sits, in your own words>"
+    if [[ -L "$PLAN_FILE" ]]; then
+      check "safety-plan.txt has all three reflection answers, in your own words (found a symlink, not a real file)" fail
+    elif [[ -f "$PLAN_FILE" ]]; then
+      MISSING_LABELS=()
+      for label in "NEVER_TOUCH:" "UNDO_STORY:" "MY_LINE:"; do
+        case "$label" in
+          "NEVER_TOUCH:") EXPECTED_PLACEHOLDER="$PLACEHOLDER_NEVER" ;;
+          "UNDO_STORY:") EXPECTED_PLACEHOLDER="$PLACEHOLDER_UNDO" ;;
+          "MY_LINE:") EXPECTED_PLACEHOLDER="$PLACEHOLDER_LINE" ;;
+        esac
+        LINE="$(grep -m1 "^$label" "$PLAN_FILE" 2>/dev/null || true)"
+        VALUE="$(echo "$LINE" | sed "s/^$label//" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+        if [[ -z "$VALUE" || "$VALUE" == "$EXPECTED_PLACEHOLDER" ]]; then
+          MISSING_LABELS+=("$label")
+        fi
+      done
+      if [[ "${#MISSING_LABELS[@]}" -eq 0 ]]; then
+        check "safety-plan.txt has all three reflection answers, in your own words" pass
+      else
+        check "safety-plan.txt has all three reflection answers, in your own words (still needed: ${MISSING_LABELS[*]})" fail
+      fi
+    else
+      check "safety-plan.txt has all three reflection answers, in your own words" fail
     fi
     ;;
   *)
