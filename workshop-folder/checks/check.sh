@@ -123,6 +123,17 @@ file_inode() {
 # changes -- never let it silently drift from what's actually on disk.
 EXPECTED_WELCOME_NOTE_SHA256="f9f6b278a9732f0dbcc0969414f34d7365942ce8e8aea705775a5e933b8e7475"
 EXPECTED_VENUE_HISTORY_SHA256="3afe8aea8f84e6fff4da67c0f48d14b7956c6630ff06756c2ea2bb6180eec7a5"
+# Module 08's mapping CSV and bookings CSV get the same embedded-checksum
+# treatment. Its 25 original photo fixtures get ONE aggregate checksum
+# instead of 25 individual ones -- a single sha256 over `cat`'ing all 25
+# files in sorted filename order (IMG_0001.jpg .. IMG_0025.jpg, which is
+# also lexical order since the number is zero-padded to a fixed width).
+# This still catches a tampered "original" fixture (the same class of bypass
+# a per-file embedded checksum would catch) without hand-maintaining 25
+# separate constants.
+EXPECTED_PHOTO_MAPPING_SHA256="19c417a42d6c603c4f1ce9bc7ddd21065c23bbdf0121463228fa97113b480d54"
+EXPECTED_PHOTOS_FIXTURE_SHA256="85335940951fb7685d44016bd4648a82652f680ef14c6fbcb44eafc2bb58ba53"
+EXPECTED_BOOKINGS_SHA256="28e7e7f4a7c51441ad184bc590afe2b1b330b0781ce1ead3c988c46ce208799f"
 
 echo "-- Wade In required checklist: Module $MODULE ------------------------"
 echo ""
@@ -414,6 +425,299 @@ case "$MODULE" in
       fi
     else
       check "02-meet/answers.txt has all three reflection answers, in your own words" fail
+    fi
+    ;;
+  08)
+    # Module 08 has two independent halves -- batch rename (Jack Crews's 25
+    # delivery photos) and mail merge (Penny's 6 booking-confirmation
+    # letters) -- both required. Every fixture involved is checksum-
+    # protected, per docs/workshop-design.md §7's Module 08 row and this
+    # script's own established hardening conventions above: never trust a
+    # live fixture at check time, reject symlinks/hard links standing in for
+    # required files or directories (at the leaf AND the parent), no
+    # `declare -A` anywhere (bash 3.2 compatibility, see Module 01's comment
+    # on this above).
+
+    # --- Half 1: batch rename from a mapping fixture ----------------------
+
+    # 1. The mapping fixture itself is checksum-protected. Without this, an
+    #    edited mapping (e.g. quietly changing one row's expected new name)
+    #    would make the checker "faithfully" verify a renamed set against a
+    #    tampered expectation instead of the real one -- the same class of
+    #    bypass Module 02's venue-history fixture check already guards
+    #    against.
+    MAPPING_CSV="$ROOT/fixtures/photo-mapping.csv"
+    MAPPING_SUM="$(file_checksum "$MAPPING_CSV" 2>/dev/null || echo "MISSING_FIXTURE")"
+    if [[ "$MAPPING_SUM" == "$EXPECTED_PHOTO_MAPPING_SHA256" ]]; then
+      check "fixtures/photo-mapping.csv matches its expected content" pass
+      MAPPING_OK=true
+    else
+      check "fixtures/photo-mapping.csv matches its expected content (contact the workshop, not your own mistake)" fail
+      MAPPING_OK=false
+    fi
+
+    # 2. The 25 original photo fixtures are checksum-protected too, as one
+    #    aggregate hash over all 25 files concatenated in sorted filename
+    #    order (see EXPECTED_PHOTOS_FIXTURE_SHA256's own comment, above).
+    #    This closes a specific bypass: an agent that "fixes" the original
+    #    fixture to match a wrong or corrupted renamed output would
+    #    otherwise make the per-file comparison below "pass" against a
+    #    tampered original instead of the real one.
+    PHOTOS_FIXTURE_DIR="$ROOT/fixtures/photos"
+    PHOTOS_FIXTURE_OK=false
+    if [[ "$CHECKSUM_TOOL_AVAILABLE" == false ]]; then
+      check "fixtures/photos/ original 25 photos match their expected content (couldn't verify: no checksum tool found on this system - contact the workshop)" fail
+    elif [[ -d "$PHOTOS_FIXTURE_DIR" ]]; then
+      if command -v sha256sum >/dev/null 2>&1; then
+        PHOTOS_AGG_SUM="$(cat "$PHOTOS_FIXTURE_DIR"/IMG_*.jpg 2>/dev/null | sha256sum | awk '{print $1}')"
+      else
+        PHOTOS_AGG_SUM="$(cat "$PHOTOS_FIXTURE_DIR"/IMG_*.jpg 2>/dev/null | shasum -a 256 | awk '{print $1}')"
+      fi
+      if [[ "$PHOTOS_AGG_SUM" == "$EXPECTED_PHOTOS_FIXTURE_SHA256" ]]; then
+        check "fixtures/photos/ original 25 photos match their expected content" pass
+        PHOTOS_FIXTURE_OK=true
+      else
+        check "fixtures/photos/ original 25 photos match their expected content (contact the workshop, not your own mistake)" fail
+      fi
+    else
+      check "fixtures/photos/ original 25 photos match their expected content (contact the workshop, not your own mistake)" fail
+    fi
+
+    # 3. 08-auto/photos/ must be a real directory, not a symlink standing in
+    #    for one -- same convention as Module 02's 02-meet/ check. Rejecting
+    #    this at the directory level also covers a symlinked `08-auto`
+    #    parent, since `cd`-ing through either level resolves physically.
+    EXPECTED_PHOTOS_OUT="$ROOT/08-auto/photos"
+    PHOTOS_OUT_OK=true
+    if [[ -e "$EXPECTED_PHOTOS_OUT" ]]; then
+      REAL_PHOTOS_OUT="$(cd "$EXPECTED_PHOTOS_OUT" 2>/dev/null && pwd -P || echo "")"
+      if [[ "$REAL_PHOTOS_OUT" != "$EXPECTED_PHOTOS_OUT" ]]; then
+        PHOTOS_OUT_OK=false
+      fi
+    fi
+
+    # 4. Every one of the 25 mapped files: present under its new name in
+    #    08-auto/photos/, not a symlink, not a hard link back to its
+    #    original (same inode -- content matches, but `cp` never ran), and
+    #    byte-identical to ITS OWN original fixture (derived fresh at check
+    #    time from the pristine fixtures/photos/ -- not an embedded key for
+    #    each file, per this module's own design: the mapping and the
+    #    originals are what's checksum-pinned, above, so this per-file
+    #    comparison is trustworthy without needing 25 more constants).
+    RENAMED_TOTAL=0
+    RENAMED_OK_COUNT=0
+    if [[ "$MAPPING_OK" == true && "$PHOTOS_FIXTURE_OK" == true && "$PHOTOS_OUT_OK" == true ]]; then
+      while IFS=',' read -r ORIG NEWNAME; do
+        [[ "$ORIG" == "original_filename" ]] && continue
+        [[ -z "$ORIG" ]] && continue
+        RENAMED_TOTAL=$((RENAMED_TOTAL + 1))
+        ORIG_PATH="$PHOTOS_FIXTURE_DIR/$ORIG"
+        OUT_PATH="$EXPECTED_PHOTOS_OUT/$NEWNAME"
+        if [[ -L "$OUT_PATH" ]]; then
+          continue
+        fi
+        if [[ ! -f "$OUT_PATH" ]]; then
+          continue
+        fi
+        OUT_INODE="$(file_inode "$OUT_PATH")"
+        ORIG_INODE="$(file_inode "$ORIG_PATH")"
+        if [[ "$OUT_INODE" != "NO_STAT_TOOL" && "$OUT_INODE" == "$ORIG_INODE" ]]; then
+          continue
+        fi
+        OUT_SUM="$(file_checksum "$OUT_PATH")"
+        ORIG_SUM="$(file_checksum "$ORIG_PATH")"
+        if [[ "$OUT_SUM" == "$ORIG_SUM" ]]; then
+          RENAMED_OK_COUNT=$((RENAMED_OK_COUNT + 1))
+        fi
+      done < "$MAPPING_CSV"
+    fi
+
+    if [[ "$PHOTOS_OUT_OK" == false ]]; then
+      check "all 25 photos renamed into 08-auto/photos/, correctly named and byte-identical to their originals (08-auto/photos/ is a symlink, not a real directory)" fail
+    elif [[ "$MAPPING_OK" != true ]]; then
+      check "all 25 photos renamed into 08-auto/photos/, correctly named and byte-identical to their originals (couldn't verify: fixtures/photo-mapping.csv doesn't match its expected content)" fail
+    elif [[ "$PHOTOS_FIXTURE_OK" != true ]]; then
+      check "all 25 photos renamed into 08-auto/photos/, correctly named and byte-identical to their originals (couldn't verify: original fixtures/photos/ doesn't match its expected content)" fail
+    elif [[ "$RENAMED_TOTAL" -eq 25 && "$RENAMED_OK_COUNT" -eq 25 ]]; then
+      check "all 25 photos renamed into 08-auto/photos/, correctly named and byte-identical to their originals" pass
+    else
+      check "all 25 photos renamed into 08-auto/photos/, correctly named and byte-identical to their originals (found $RENAMED_OK_COUNT/25 correct)" fail
+    fi
+
+    # 5. No extras: every expected renamed file was already individually
+    #    verified above, so if the TOTAL number of entries actually sitting
+    #    in 08-auto/photos/ also equals 25, that rules out any additional
+    #    file (or directory, or stray symlink) the mapping doesn't account
+    #    for -- a bash-3.2-safe equivalent of a full closed-set comparison,
+    #    with no associative arrays anywhere.
+    if [[ "$PHOTOS_OUT_OK" == false ]]; then
+      check "08-auto/photos/ contains exactly the 25 expected files, no extras (08-auto/photos/ is a symlink, not a real directory)" fail
+    else
+      ACTUAL_PHOTO_COUNT="$(find "$EXPECTED_PHOTOS_OUT" -mindepth 1 -maxdepth 1 2>/dev/null | wc -l | tr -d ' ')"
+      if [[ "$ACTUAL_PHOTO_COUNT" -eq 25 ]]; then
+        check "08-auto/photos/ contains exactly the 25 expected files, no extras" pass
+      else
+        check "08-auto/photos/ contains exactly the 25 expected files, no extras (found $ACTUAL_PHOTO_COUNT)" fail
+      fi
+    fi
+
+    # --- Half 2: mail merge from a CSV fixture -----------------------------
+
+    # 6. The bookings fixture is checksum-protected, same reasoning as the
+    #    mapping fixture above.
+    BOOKINGS_CSV="$ROOT/fixtures/bookings-for-letters.csv"
+    BOOKINGS_SUM="$(file_checksum "$BOOKINGS_CSV" 2>/dev/null || echo "MISSING_FIXTURE")"
+    if [[ "$BOOKINGS_SUM" == "$EXPECTED_BOOKINGS_SHA256" ]]; then
+      check "fixtures/bookings-for-letters.csv matches its expected content" pass
+      BOOKINGS_OK=true
+    else
+      check "fixtures/bookings-for-letters.csv matches its expected content (contact the workshop, not your own mistake)" fail
+      BOOKINGS_OK=false
+    fi
+
+    # 08-auto/letters/ must be a real directory, not a symlink (same
+    # convention as 08-auto/photos/, above).
+    EXPECTED_LETTERS_OUT="$ROOT/08-auto/letters"
+    LETTERS_OUT_OK=true
+    if [[ -e "$EXPECTED_LETTERS_OUT" ]]; then
+      REAL_LETTERS_OUT="$(cd "$EXPECTED_LETTERS_OUT" 2>/dev/null && pwd -P || echo "")"
+      if [[ "$REAL_LETTERS_OUT" != "$EXPECTED_LETTERS_OUT" ]]; then
+        LETTERS_OUT_OK=false
+      fi
+    fi
+
+    # Enumerate the letters actually sitting in 08-auto/letters/: real files
+    # only, rejecting a symlink or a hard link standing in for one (link
+    # count above 1), same convention as every earlier check in this script.
+    LETTER_FILES=()
+    LETTERS_TOTAL_ENTRIES=0
+    if [[ "$LETTERS_OUT_OK" == true ]]; then
+      LETTERS_TOTAL_ENTRIES="$(find "$EXPECTED_LETTERS_OUT" -mindepth 1 -maxdepth 1 2>/dev/null | wc -l | tr -d ' ')"
+      while IFS= read -r -d '' entry; do
+        if [[ -L "$entry" ]]; then
+          continue
+        fi
+        if [[ -f "$entry" ]]; then
+          LINK_COUNT="$(stat -f '%l' "$entry" 2>/dev/null || stat -c '%h' "$entry" 2>/dev/null || echo "1")"
+          if [[ "$LINK_COUNT" == "1" ]]; then
+            LETTER_FILES+=("$entry")
+          fi
+        fi
+      done < <(find "$EXPECTED_LETTERS_OUT" -mindepth 1 -maxdepth 1 -print0 2>/dev/null)
+    fi
+
+    # 7. Exactly 6 real, usable letter files -- no extras, no symlinks or
+    #    hard links standing in for one.
+    if [[ "$LETTERS_OUT_OK" == false ]]; then
+      check "08-auto/letters/ contains exactly 6 real letter files, no extras, no symlinks or hard links (08-auto/letters/ is a symlink, not a real directory)" fail
+    elif [[ "$LETTERS_TOTAL_ENTRIES" -eq 6 && "${#LETTER_FILES[@]}" -eq 6 ]]; then
+      check "08-auto/letters/ contains exactly 6 real letter files, no extras, no symlinks or hard links" pass
+    else
+      check "08-auto/letters/ contains exactly 6 real letter files, no extras, no symlinks or hard links (found $LETTERS_TOTAL_ENTRIES entries, ${#LETTER_FILES[@]} usable)" fail
+    fi
+
+    # 8. Every one of the 6 booking rows is matched to its own, distinct
+    #    letter file -- containing that row's exact name and event date
+    #    (fixed-string match) and its exact amount (extracted as a numeric
+    #    token and matched exactly, same technique as Module 02's founding-
+    #    year/capacity check, so "515.00" can't be falsely satisfied by a
+    #    letter that actually says "1515.00" or "515.005"). Matching is
+    #    greedy but exclusive (CLAIMED tracks which file has already been
+    #    used) -- a single file crammed with all 6 rows' data can satisfy at
+    #    most one row, not all six, since a claimed file is removed from
+    #    consideration for the rest.
+    ROW_TOTAL=0
+    ROW_MATCH_OK=0
+    if [[ "$BOOKINGS_OK" == true && "$LETTERS_OUT_OK" == true && "${#LETTER_FILES[@]}" -gt 0 ]]; then
+      CLAIMED=()
+      for ((i = 0; i < ${#LETTER_FILES[@]}; i++)); do
+        CLAIMED[i]=0
+      done
+      while IFS=',' read -r NAME EVENT_DATE AMOUNT; do
+        [[ "$NAME" == "name" ]] && continue
+        [[ -z "$NAME" ]] && continue
+        ROW_TOTAL=$((ROW_TOTAL + 1))
+        FOUND=false
+        for ((i = 0; i < ${#LETTER_FILES[@]}; i++)); do
+          [[ "${CLAIMED[i]}" == "1" ]] && continue
+          CANDIDATE="${LETTER_FILES[i]}"
+          if grep -qF -- "$NAME" "$CANDIDATE" 2>/dev/null \
+            && grep -qF -- "$EVENT_DATE" "$CANDIDATE" 2>/dev/null \
+            && grep -oE -- '-?[0-9]+(\.[0-9]+)?' "$CANDIDATE" 2>/dev/null | grep -qxF -- "$AMOUNT"; then
+            CLAIMED[i]=1
+            FOUND=true
+            break
+          fi
+        done
+        [[ "$FOUND" == true ]] && ROW_MATCH_OK=$((ROW_MATCH_OK + 1))
+      done < "$BOOKINGS_CSV"
+    fi
+
+    if [[ "$BOOKINGS_OK" != true ]]; then
+      check "all 6 letters contain their row's exact name, event date, and amount from the CSV (couldn't verify: fixtures/bookings-for-letters.csv doesn't match its expected content)" fail
+    elif [[ "$LETTERS_OUT_OK" == false ]]; then
+      check "all 6 letters contain their row's exact name, event date, and amount from the CSV (08-auto/letters/ is a symlink, not a real directory)" fail
+    elif [[ "$ROW_TOTAL" -eq 6 && "$ROW_MATCH_OK" -eq 6 ]]; then
+      check "all 6 letters contain their row's exact name, event date, and amount from the CSV" pass
+    else
+      check "all 6 letters contain their row's exact name, event date, and amount from the CSV (matched $ROW_MATCH_OK/6)" fail
+    fi
+
+    # 9. Zero unexpanded template placeholders across every letter -- a
+    #    literal count of the substring "{{" across all the real letter
+    #    files found above. Any leftover "{{name}}"-shaped placeholder means
+    #    the merge didn't actually run for that row.
+    if [[ "$LETTERS_OUT_OK" == false ]]; then
+      check "zero unfilled template placeholders across the letters (08-auto/letters/ is a symlink, not a real directory)" fail
+    elif [[ "${#LETTER_FILES[@]}" -eq 0 ]]; then
+      check "zero unfilled template placeholders across the letters (no letter files found to check)" fail
+    else
+      PLACEHOLDER_COUNT=0
+      for CANDIDATE in "${LETTER_FILES[@]}"; do
+        C="$(grep -o '{{' "$CANDIDATE" 2>/dev/null | wc -l | tr -d ' ')"
+        PLACEHOLDER_COUNT=$((PLACEHOLDER_COUNT + C))
+      done
+      if [[ "$PLACEHOLDER_COUNT" -eq 0 ]]; then
+        check "zero unfilled template placeholders across the letters (no literal {{ left)" pass
+      else
+        check "zero unfilled template placeholders across the letters (found $PLACEHOLDER_COUNT occurrences of {{)" fail
+      fi
+    fi
+
+    # 10. Own-words write-up: same discipline as Modules 01 and 02 -- presence-
+    #    checked for genuine content, rejecting the literal placeholder text
+    #    from the module page itself, and rejecting a symlink or hard link
+    #    standing in for a real file.
+    ANSWERS08="$ROOT/08-auto/answers.txt"
+    ANSWERS08_LINK_COUNT="$(stat -f '%l' "$ANSWERS08" 2>/dev/null || stat -c '%h' "$ANSWERS08" 2>/dev/null || echo "1")"
+    PLACEHOLDER_REUSABLE08="<could this same template-and-mapping approach run again next month with new inputs? What would have to change, and what would stay the same?>"
+    PLACEHOLDER_FIRST_CHANGE08="<the first thing you'd change about how you asked for this job, if you ran it again>"
+    if [[ -L "$ANSWERS08" ]]; then
+      check "08-auto/answers.txt has both reflection answers, in your own words (found a symlink, not a real file)" fail
+    elif [[ -f "$ANSWERS08" && "$ANSWERS08_LINK_COUNT" != "1" ]]; then
+      check "08-auto/answers.txt has both reflection answers, in your own words (found a hard link, not an independently-written file)" fail
+    elif [[ -f "$ANSWERS08" ]]; then
+      MISSING_LABELS=()
+      # Bash-3.2-safe case statement, not an associative array -- see the
+      # matching comment on Module 01's identical pattern, above, for why.
+      for label in "REUSABLE:" "FIRST_CHANGE:"; do
+        case "$label" in
+          "REUSABLE:") EXPECTED_PLACEHOLDER="$PLACEHOLDER_REUSABLE08" ;;
+          "FIRST_CHANGE:") EXPECTED_PLACEHOLDER="$PLACEHOLDER_FIRST_CHANGE08" ;;
+        esac
+        LINE="$(grep -m1 "^$label" "$ANSWERS08" 2>/dev/null || true)"
+        VALUE="$(echo "$LINE" | sed "s/^$label//" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+        if [[ -z "$VALUE" || "$VALUE" == "$EXPECTED_PLACEHOLDER" ]]; then
+          MISSING_LABELS+=("$label")
+        fi
+      done
+      if [[ "${#MISSING_LABELS[@]}" -eq 0 ]]; then
+        check "08-auto/answers.txt has both reflection answers, in your own words" pass
+      else
+        check "08-auto/answers.txt has both reflection answers, in your own words (still needed: ${MISSING_LABELS[*]})" fail
+      fi
+    else
+      check "08-auto/answers.txt has both reflection answers, in your own words" fail
     fi
     ;;
   *)
