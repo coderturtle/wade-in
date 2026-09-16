@@ -136,10 +136,11 @@ your own answer, even a short one.
 
 ## Takeaway
 
-Add a research prompt template to `my-pack/`: demand named sources for any factual claim, keep what
+Add `my-pack/recipe-research-prompt.md`: demand named sources for any factual claim, keep what
 a source actually says separate from Claude Code's summary of it, and check at least one source
 yourself before treating a research brief as finished. This is the same ask-watch-check rhythm every
-earlier module taught, pointed outward at the open web instead of inward at workshop files.
+earlier module taught, pointed outward at the open web instead of inward at workshop files. The
+capstone checks for this file by its exact name, so use it as shown, not a name of your own choosing.
 
 ---
 

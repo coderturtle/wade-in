@@ -3185,11 +3185,16 @@ case "$MODULE" in
     fi
 
     # === Pack completeness gate ===
-    # Checks what modules 01-09 actually produce, not an idealized naming scheme:
-    # three exactly-named files (Modules 01/02, 04, 09), the root CLAUDE.md's
-    # Module 03 headers, and a count-based proxy for the loosely-specified
-    # Modules 05/06/07/08 contributions (each says "add something to my-pack/"
-    # without dictating a filename).
+    # Checks what modules 01-09 actually ask the learner to produce: three
+    # exactly-named files (Modules 01/02, 04, 09), the root CLAUDE.md's Module
+    # 03 headers, and five more exactly-named recipe files (Modules 05-08,
+    # Module 08 contributing two). Named, not counted -- a count-based proxy
+    # was gameable by five unrelated stub files, a real finding from this
+    # workshop's own Workshop Review Panel (2026-09-16, Instructional
+    # Designer persona). Each named file also needs a real word count and
+    # must not just be its own source module's Takeaway paragraph pasted
+    # verbatim -- the same panel's own DDD-style adversarial pass on this
+    # exact fix named that as a real, cheap bypass a length-only bar misses.
     MY_PACK_DIR="$ROOT/my-pack"
     MY_PACK_DIR_OK=true
     if [[ -e "$MY_PACK_DIR" ]]; then
@@ -3238,25 +3243,48 @@ case "$MODULE" in
       check "the workshop folder's CLAUDE.md still has its original headers after Module 03's edit" fail
     fi
 
-    MY_PACK_EXTRA_COUNT=0
-    if [[ "$MY_PACK_DIR_OK" == true ]]; then
-      while IFS= read -r -d '' entry; do
-        [[ -L "$entry" ]] && continue
-        BASE_NAME="$(basename "$entry")"
-        case "$BASE_NAME" in
-          .gitkeep|cheatsheet.md|recipe-safe-script-direction.md|real-folder-ritual.md) continue ;;
-        esac
-        if [[ -f "$entry" && -s "$entry" ]]; then
-          LINK_COUNT="$(stat -f '%l' "$entry" 2>/dev/null || stat -c '%h' "$entry" 2>/dev/null || echo "1")"
-          [[ "$LINK_COUNT" == "1" ]] && MY_PACK_EXTRA_COUNT=$((MY_PACK_EXTRA_COUNT + 1))
+    # Five more named recipes, one per Modules 05-07 and two from Module 08.
+    # Each needs: real file (not symlink/hard-link), at least 40 words (the
+    # same bar the capstone's own answers.txt already uses), and not just its
+    # source module's own Takeaway paragraph copied verbatim -- checked via a
+    # distinctive, sufficiently long excerpt from that exact paragraph,
+    # normalized for whitespace so line-wrapping alone doesn't dodge it.
+    for recipe_check in \
+      "recipe-research-prompt.md:your research-prompt recipe from Module 05:demand named sources for any factual claim" \
+      "recipe-document-drafting.md:your document-drafting recipe from Module 06:name the source file, name the exact output path" \
+      "recipe-csv-task.md:your CSV-task recipe from Module 07:state the rule before you ask, demand a before/after count" \
+      "recipe-batch-rename.md:your batch-rename recipe from Module 08:point Claude Code at a folder of files and a mapping sheet" \
+      "recipe-mail-merge.md:your mail-merge recipe from Module 08:point it at a CSV and a template with placeholders"; do
+      recipe_file="$(printf '%s' "$recipe_check" | awk -F':' '{print $1}')"
+      recipe_label="$(printf '%s' "$recipe_check" | awk -F':' '{print $2}')"
+      recipe_banned_excerpt="$(printf '%s' "$recipe_check" | awk -F':' '{print $3}')"
+      RECIPE_PATH="$MY_PACK_DIR/$recipe_file"
+      RECIPE_EXISTS_OK=false
+      if [[ "$MY_PACK_DIR_OK" == true && -f "$RECIPE_PATH" && ! -L "$RECIPE_PATH" ]]; then
+        RECIPE_LINK_COUNT="$(stat -f '%l' "$RECIPE_PATH" 2>/dev/null || stat -c '%h' "$RECIPE_PATH" 2>/dev/null || echo "1")"
+        [[ "$RECIPE_LINK_COUNT" == "1" ]] && RECIPE_EXISTS_OK=true
+      fi
+      if [[ "$RECIPE_EXISTS_OK" == true ]]; then
+        check "my-pack/$recipe_file exists ($recipe_label)" pass
+      else
+        check "my-pack/$recipe_file exists ($recipe_label)" fail
+      fi
+
+      RECIPE_WORDS=0
+      RECIPE_VERBATIM=false
+      if [[ "$RECIPE_EXISTS_OK" == true ]]; then
+        RECIPE_WORDS="$(wc -w < "$RECIPE_PATH" 2>/dev/null | tr -d ' ')"
+        RECIPE_NORMALIZED="$(tr '\n' ' ' < "$RECIPE_PATH" 2>/dev/null | tr -s ' ')"
+        if printf '%s' "$RECIPE_NORMALIZED" | grep -qF "$recipe_banned_excerpt"; then
+          RECIPE_VERBATIM=true
         fi
-      done < <(find "$MY_PACK_DIR" -mindepth 1 -not -name '.*' -print0 2>/dev/null)
-    fi
-    if [[ "$MY_PACK_EXTRA_COUNT" -ge 5 ]]; then
-      check "my-pack/ has real entries from Modules 05-08 too (found $MY_PACK_EXTRA_COUNT beyond the three named files, need at least 5)" pass
-    else
-      check "my-pack/ has real entries from Modules 05-08 too (found $MY_PACK_EXTRA_COUNT beyond the three named files, need at least 5)" fail
-    fi
+      fi
+      if [[ "$RECIPE_EXISTS_OK" == true && "$RECIPE_WORDS" -ge 40 && "$RECIPE_VERBATIM" == false ]]; then
+        check "my-pack/$recipe_file has real, substantial content in your own words" pass
+      else
+        check "my-pack/$recipe_file has real, substantial content in your own words" fail
+      fi
+    done
 
     # === Tier 2: own-words capstone reflection ===
     CAPSTONE_ANSWERS="$ROOT/10-capstone/answers.txt"
