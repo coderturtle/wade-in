@@ -79,15 +79,36 @@ deployment:
   create_domain_verification: true
   pages_enabled: true
   custom_domain_set: true
+  hosted_zone_id: Z3DLQAZ6G5LV63
+  record_fqdn: wade-in.coderturtle.io
+  applied_date: 2026-09-16
+  human_confirmed: true
+  https_enforced: false
+  site_content_live: false
   # Onboarded as the eighth github-pages-dns consumer, agentic-infra-lab PR #15
-  # (dermdunc/agentic-infra-lab), 2026-09-16. Repo-side: Pages enabled
-  # (build_type: workflow) and custom domain set via `gh api POST` then `PUT
+  # (dermdunc/agentic-infra-lab). Repo-side: Pages enabled (build_type:
+  # workflow) and custom domain set via `gh api POST` then `PUT
   # repos/coderturtle/wade-in/pages`, using the human's own authenticated gh
-  # session (not GITHUB_TOKEN) - confirmed via
-  # `gh api repos/coderturtle/wade-in/pages` directly. terraform plan is
-  # GREEN (1 create, CNAME only) and awaiting human `terraform apply` - not
-  # yet applied. record_fqdn/verification_record_fqdn/human_confirmed/
-  # applied_date/protected_domain_state/https_certificate_state (matching
-  # copilot-fluent's own recorded shape) get filled in after that apply and
-  # GitHub's account-level domain verification are both confirmed, not before.
+  # session (not GITHUB_TOKEN). CNAME record applied by the human via
+  # `terraform apply "tfplan"` (2026-09-16); confirmed live for real, not
+  # just trusted from apply output - `dig +short CNAME wade-in.coderturtle.io`
+  # against two independent public resolvers, both returning
+  # "coderturtle.github.io." This was a CNAME-only apply
+  # (create_domain_verification_wade_in was false) - no TXT
+  # domain-verification record yet. https_enforced is false; GitHub may flip
+  # this automatically once a certificate issues, or it may need a manual
+  # toggle - not yet checked. site_content_live is false: no
+  # workflow_dispatch deploy has run yet.
+  #
+  # Still open, in order: (1) human runs GitHub's account-level "Add a
+  # domain" step at github.com/settings/pages for wade-in.coderturtle.io,
+  # once DNS has had time to propagate, to get the real, GitHub-issued TXT
+  # name/value (never derive or guess); (2) a second terraform plan/apply in
+  # agentic-infra-lab adds the TXT record from that real value; (3) once the
+  # TXT resolves publicly, human clicks "Verify" in the same GitHub UI
+  # (browser-only, no API) - confirm via
+  # `gh api repos/coderturtle/wade-in/pages --jq '.protected_domain_state'`,
+  # expect "verified"; (4) first real `workflow_dispatch` deploy, confirm
+  # live at the custom domain; (5) uncomment deploy-pages.yml's `push`
+  # trigger for auto-publish going forward.
 
