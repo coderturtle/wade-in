@@ -190,6 +190,10 @@ rather than after. Still a real, cheap habit worth keeping every time you open C
 somewhere new - your actual protection today is the ritual itself (the separate backup, the
 manifests, the verify step below), not this file.
 
+One thing worth knowing before you run your after-manifest: this optional `CLAUDE.md` will show up
+as a second new file alongside `index.txt` once you do. That's fine - the checklist below looks for
+`index.txt` specifically, by name, so `CLAUDE.md` sitting there too doesn't affect anything.
+
 Now, and only now, point Claude Code at the real folder itself:
 
 ```
