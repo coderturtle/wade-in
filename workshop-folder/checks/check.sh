@@ -117,12 +117,73 @@ file_inode() {
   stat -f '%i' "$1" 2>/dev/null || stat -c '%i' "$1" 2>/dev/null || echo "NO_STAT_TOOL"
 }
 
+trim_field() {
+  # Strip leading/trailing whitespace from one CSV field value. Found by a
+  # fresh-context adversarial pass on Module 07: a semantically-correct
+  # merge, written with a space after each comma (`BK-101, Name, ...`
+  # instead of no-space CSV -- a plausible style if a script hand-writes
+  # the CSV as text), failed 3 of 8 checks with generic messages giving no
+  # hint the real cause was stray whitespace, not a merge error. Trimming
+  # each field before comparison treats "400" and " 400" as the same
+  # value, matching what a human would consider "the same," without
+  # weakening the exact-match check against any REAL content difference.
+  printf '%s' "$1" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'
+}
+
+array_index_of() {
+  # Bash-3.2-safe lookup: given a target value and a haystack passed as
+  # remaining args, print the matching index or "-1". This, plus a plain
+  # indexed array, is this script's stand-in for an associative array's key
+  # lookup -- `declare -A` is never used anywhere in this script (stock
+  # macOS bash 3.2 has no associative arrays at all and crashes hard on one,
+  # confirmed and fixed twice already; see the comment on Module 01's
+  # answers check below for the exact failure mode).
+  #
+  # Caller responsibility: expanding "${arr[@]}" for a genuinely
+  # zero-length array under this script's `set -u` trips a real bash
+  # bug present in versions before 4.4 ("unbound variable" on an empty
+  # array even though it was explicitly initialized with `arr=()`) -- stock
+  # bash 3.2 has this bug. Every call site below guards with
+  # `[[ "${#arr[@]}" -gt 0 ]]` before expanding an array into this
+  # function's arguments, rather than expanding an possibly-empty array
+  # directly.
+  local target="$1"
+  shift
+  local i=0
+  local v
+  for v in "$@"; do
+    if [[ "$v" == "$target" ]]; then
+      printf '%s\n' "$i"
+      return 0
+    fi
+    i=$((i + 1))
+  done
+  printf '%s\n' "-1"
+  return 1
+}
+
 # Embedded checksums: the real, known-good sha256 of each fixture as
 # authored, computed once and pinned here. Update this value deliberately
 # (and note why, in a commit message) any time a fixture's real content
 # changes -- never let it silently drift from what's actually on disk.
 EXPECTED_WELCOME_NOTE_SHA256="f9f6b278a9732f0dbcc0969414f34d7365942ce8e8aea705775a5e933b8e7475"
 EXPECTED_VENUE_HISTORY_SHA256="3afe8aea8f84e6fff4da67c0f48d14b7956c6630ff06756c2ea2bb6180eec7a5"
+EXPECTED_STAFF_LIST_SHA256="f7e6af0c87228e99d6d880b0b4b10bc1cda45e708f03235eaa2fcd973be9243f"
+EXPECTED_EMMETT_MEMO_SHA256="7abfa8b6da208141a046ac44fc903e56d4692cd4d190b9660ed3d2526a9fb5d3"
+EXPECTED_MONTHLY_RAW_NUMBERS_SHA256="9268dbb4a3b65e437b159a082ee51eeb7d70bd24365bdbca6004a24206aea255"
+EXPECTED_PENNY_BOOKINGS_SHA256="a84d9f1d87635beee84c0cebb4543c5212c7b09bab9d52bf20d755f4bbd78c6d"
+EXPECTED_GARRETT_BOOKINGS_SHA256="4d1159c92e231829fd0b985028e268bfcc31d9cb3aa806c310e28a420dcc388d"
+# Module 08's mapping CSV and bookings CSV get the same embedded-checksum
+# treatment. Its 25 original photo fixtures get ONE aggregate checksum
+# instead of 25 individual ones -- a single sha256 over `cat`'ing all 25
+# files in sorted filename order (IMG_0001.jpg .. IMG_0025.jpg, which is
+# also lexical order since the number is zero-padded to a fixed width).
+# This still catches a tampered "original" fixture (the same class of bypass
+# a per-file embedded checksum would catch) without hand-maintaining 25
+# separate constants.
+EXPECTED_PHOTO_MAPPING_SHA256="19c417a42d6c603c4f1ce9bc7ddd21065c23bbdf0121463228fa97113b480d54"
+EXPECTED_PHOTOS_FIXTURE_SHA256="85335940951fb7685d44016bd4648a82652f680ef14c6fbcb44eafc2bb58ba53"
+EXPECTED_BOOKINGS_SHA256="28e7e7f4a7c51441ad184bc590afe2b1b330b0781ce1ead3c988c46ce208799f"
 EXPECTED_STANDIN_NOTE_SHA256="3d322629bbf07b27385c321bbc9e7a5a01945555676d2f9a72d4393ff5676712"
 EXPECTED_STANDIN_PACKING_SHA256="f1834bcffc2c2eb9c4ec5b37de0aba444f417560b2c0f0d45182cb74b78c5c81"
 EXPECTED_STANDIN_RECIPE_SHA256="13c259fb430dbee8c8a58f53db27fb3e81f7712000e11ae77b0a067f360bd413"
@@ -186,6 +247,28 @@ pin_get() {
   local tag="$1" pinfile="$2"
   [[ -f "$pinfile" ]] || return 0
   awk -F'\t' -v t="$tag" '$1==t{v=$2} END{if (v!="") print v}' "$pinfile" 2>/dev/null
+}
+
+# Module 04's 12 door-count fixtures, one embedded sha256 per date. A `case`
+# statement, not `declare -A` -- see the Module 01/02 comment below on why:
+# stock macOS bash 3.2 has no associative arrays, and `declare -A` crashes
+# the whole script there with no RESULT line at all.
+door_count_expected_sha256() {
+  case "$1" in
+    2026-08-01) echo "9f3a8b0744369ca0b6f7a5769d390ac4a6b72a34ad51a3a045132b5ed8487d05" ;;
+    2026-08-02) echo "a183c3cd769d0b13246e3e514b50cb109843589f2cd7941a28e25abeade1eb54" ;;
+    2026-08-03) echo "9d0ca4e2d2baf943d302bcc99405155781a8693844354566f98458b1ccf6009d" ;;
+    2026-08-04) echo "3e0793a8e27e75cdc0620846373717e3e0b475ef224f1a068e4bc941fa4a6382" ;;
+    2026-08-05) echo "6ed3288ba4c4903931664d796e3525baf5366ec6b2c39c5dde6bdfb758ed0176" ;;
+    2026-08-06) echo "fa474fc1e93a53e7c03ce55cfb4f8681f3f14f0a7aa580ab930997ff64334482" ;;
+    2026-08-07) echo "4a5f01d395b6ebb6fb2913b7832a35f9c0c302cef096f2c13389e3c4e4161866" ;;
+    2026-08-08) echo "1b89b5f6799ea7775b7c35cbe5a87f7e15481f33a78ebf67fd401bf257028730" ;;
+    2026-08-09) echo "f8b9e67bfd801f5c1ad79191e1306704c3b9d33f77e2739aabd6ef761b0af800" ;;
+    2026-08-10) echo "978a2a71906bb53d2079865e2ce3cb6bc3363245a2fbdfcf4a171c8cf410eff5" ;;
+    2026-08-11) echo "6e74f02629bbd62f12222ca010716891e23bed2f9c8d921ee5cb2f88463f09f7" ;;
+    2026-08-12) echo "c0f0ac145ff52a136daa425d148b70c757fd1989f976635cc07f2413f4dc100c" ;;
+    *) echo "" ;;
+  esac
 }
 
 echo "-- Wade In required checklist: Module $MODULE ------------------------"
@@ -478,6 +561,1487 @@ case "$MODULE" in
       fi
     else
       check "02-meet/answers.txt has all three reflection answers, in your own words" fail
+    fi
+    ;;
+  03)
+    # 1. 03-files/ itself is a real directory, not a symlink standing in for
+    #    one -- same convention as 01-terminal/my-notes/ and 02-meet/.
+    EXPECTED_03_FILES="$ROOT/03-files"
+    FILES_DIR_OK=true
+    if [[ -e "$EXPECTED_03_FILES" ]]; then
+      REAL_03_FILES="$(cd "$EXPECTED_03_FILES" 2>/dev/null && pwd -P || echo "")"
+      if [[ "$REAL_03_FILES" != "$EXPECTED_03_FILES" ]]; then
+        FILES_DIR_OK=false
+      fi
+    fi
+
+    CORRECTED="$ROOT/03-files/staff-list-corrected.txt"
+    STAFF_FIXTURE="$ROOT/fixtures/staff-list.txt"
+    MEMO_FIXTURE="$ROOT/fixtures/emmett-memo.txt"
+
+    # 2. staff-list-corrected.txt exists for real -- not a symlink, and not a
+    #    hard link either (same discipline as 02-meet/summary.txt: a fresh
+    #    link count above 1 means some other path shares these exact bytes,
+    #    which a freshly-produced corrected file never does on its own).
+    CORRECTED_LINK_COUNT="$(stat -f '%l' "$CORRECTED" 2>/dev/null || stat -c '%h' "$CORRECTED" 2>/dev/null || echo "1")"
+    if [[ "$FILES_DIR_OK" == false ]]; then
+      check "03-files/staff-list-corrected.txt exists (03-files/ is a symlink, not a real directory)" fail
+    elif [[ -L "$CORRECTED" ]]; then
+      check "03-files/staff-list-corrected.txt exists (found a symlink, not a real file)" fail
+    elif [[ -f "$CORRECTED" && "$CORRECTED_LINK_COUNT" != "1" ]]; then
+      check "03-files/staff-list-corrected.txt exists (found a hard link, not an independently-written file)" fail
+    elif [[ -s "$CORRECTED" ]]; then
+      check "03-files/staff-list-corrected.txt exists and is non-empty" pass
+    else
+      check "03-files/staff-list-corrected.txt exists and is non-empty" fail
+    fi
+    CORRECTED_REAL_FILE=false
+    [[ "$FILES_DIR_OK" == true && -f "$CORRECTED" && ! -L "$CORRECTED" && "$CORRECTED_LINK_COUNT" == "1" ]] && CORRECTED_REAL_FILE=true
+
+    # 3. Both fixtures match their pinned checksums -- must pass before any
+    #    value recomputed from them can be trusted. Same embedded-checksum
+    #    discipline as every fixture above; a tampered memo (e.g. edited to
+    #    claim a different "correct" phone number) would otherwise make the
+    #    check below faithfully verify against the tampered value instead of
+    #    the real one.
+    if [[ "$CHECKSUM_TOOL_AVAILABLE" == false ]]; then
+      check "workshop fixtures staff-list.txt and emmett-memo.txt match their expected content (couldn't verify: no checksum tool found on this system - contact the workshop)" fail
+      FIXTURES_03_OK=false
+    else
+      STAFF_SUM="$(file_checksum "$STAFF_FIXTURE" 2>/dev/null || echo "MISSING_FIXTURE")"
+      MEMO_SUM="$(file_checksum "$MEMO_FIXTURE" 2>/dev/null || echo "MISSING_FIXTURE")"
+      if [[ "$STAFF_SUM" == "$EXPECTED_STAFF_LIST_SHA256" && "$MEMO_SUM" == "$EXPECTED_EMMETT_MEMO_SHA256" ]]; then
+        check "workshop fixtures staff-list.txt and emmett-memo.txt match their expected content" pass
+        FIXTURES_03_OK=true
+      else
+        check "workshop fixtures staff-list.txt and emmett-memo.txt match their expected content (contact the workshop, not your own mistake)" fail
+        FIXTURES_03_OK=false
+      fi
+    fi
+
+    # 4. Recompute the expected corrected file from the pristine fixtures,
+    #    then compare the learner's submission to it byte-for-byte. This one
+    #    whole-file comparison proves BOTH that all 4 corrections were
+    #    actually applied AND that no other line was collaterally edited -- a
+    #    wrong value, a missed correction, or a stray edit anywhere else in
+    #    the file all produce a non-matching file and fail together.
+    #
+    #    The 4 wrong/correct value pairs are parsed from the memo's OWN text
+    #    at check time, never hardcoded here -- each correction in the memo
+    #    follows the fixed pattern "<subject> says <wrong>, but it should say
+    #    <correct>.", and the line-selecting anchor phrases below (e.g.
+    #    "Penny Johnson's line says") are fixed prose the fixture was
+    #    authored with, not a hardcoded answer key. If the memo's wording is
+    #    ever revised, this recomputation moves with it, same discipline as
+    #    Module 02's fixture-derived facts.
+    #
+    #    Substitution uses perl's \Q...\E (quote-metacharacters) rather than
+    #    a bash parameter-expansion substitution or a hand-escaped sed
+    #    pattern: tested directly against stock macOS bash 3.2, and
+    #    `${var/"$pattern"/"$replacement"}` does NOT strip the quotes there
+    #    the way it does under bash 5 -- it inserts literal double-quote
+    #    characters into the output. Reproduced directly, not assumed; perl
+    #    (already relied on elsewhere in this repo) sidesteps both that bug
+    #    and any need to hand-escape regex metacharacters in the extracted
+    #    values.
+    if [[ "$CORRECTED_REAL_FILE" == true && "$FIXTURES_03_OK" == true ]]; then
+      LINE1="$(grep -m1 "Penny Johnson's line says" "$MEMO_FIXTURE" 2>/dev/null || true)"
+      LINE2="$(grep -m1 "Carl Bruner's extension says" "$MEMO_FIXTURE" 2>/dev/null || true)"
+      LINE3="$(grep -m1 "Jack Crews's job says" "$MEMO_FIXTURE" 2>/dev/null || true)"
+      LINE4="$(grep -m1 "Angelo's name says" "$MEMO_FIXTURE" 2>/dev/null || true)"
+
+      WRONG1="$(printf '%s' "$LINE1" | sed -n 's/.* says \(.*\), but it should say .*/\1/p')"
+      RIGHT1="$(printf '%s' "$LINE1" | sed -n 's/.*but it should say \([^.]*\)\..*/\1/p')"
+      WRONG2="$(printf '%s' "$LINE2" | sed -n 's/.* says \(.*\), but it should say .*/\1/p')"
+      RIGHT2="$(printf '%s' "$LINE2" | sed -n 's/.*but it should say \([^.]*\)\..*/\1/p')"
+      WRONG3="$(printf '%s' "$LINE3" | sed -n 's/.* says \(.*\), but it should say .*/\1/p')"
+      RIGHT3="$(printf '%s' "$LINE3" | sed -n 's/.*but it should say \([^.]*\)\..*/\1/p')"
+      WRONG4="$(printf '%s' "$LINE4" | sed -n 's/.* says \(.*\), but it should say .*/\1/p')"
+      RIGHT4="$(printf '%s' "$LINE4" | sed -n 's/.*but it should say \([^.]*\)\..*/\1/p')"
+
+      if [[ -z "$WRONG1" || -z "$RIGHT1" || -z "$WRONG2" || -z "$RIGHT2" || -z "$WRONG3" || -z "$RIGHT3" || -z "$WRONG4" || -z "$RIGHT4" ]]; then
+        check "staff-list-corrected.txt has all 4 corrections applied, with no other line changed (couldn't parse the memo - contact the workshop)" fail
+      else
+        EXPECTED_TMP="$(mktemp "${TMPDIR:-/tmp}/wade-in-03-expected.XXXXXX" 2>/dev/null || echo "/tmp/wade-in-03-expected.$$")"
+        WRONG1="$WRONG1" RIGHT1="$RIGHT1" WRONG2="$WRONG2" RIGHT2="$RIGHT2" \
+        WRONG3="$WRONG3" RIGHT3="$RIGHT3" WRONG4="$WRONG4" RIGHT4="$RIGHT4" \
+        perl -pe '
+          s/\Q$ENV{WRONG1}\E/$ENV{RIGHT1}/;
+          s/\Q$ENV{WRONG2}\E/$ENV{RIGHT2}/;
+          s/\Q$ENV{WRONG3}\E/$ENV{RIGHT3}/;
+          s/\Q$ENV{WRONG4}\E/$ENV{RIGHT4}/;
+        ' "$STAFF_FIXTURE" > "$EXPECTED_TMP" 2>/dev/null
+
+        # Compare with a trailing-newline-normalized checksum, not the raw
+        # file bytes -- found by a fresh-context adversarial pass: a fully
+        # correct submission (all 4 corrections applied, nothing else
+        # touched) that differed from the expected file ONLY by a missing
+        # or extra trailing newline -- an invisible, extremely common
+        # artifact of how a tool writes a file -- failed with a message
+        # ("no other line changed") that actively misled the learner about
+        # the real cause. `$(cat file)` strips all trailing newlines in
+        # bash command substitution; hashing that normalized form (not the
+        # raw file) makes trailing-newline differences invisible to this
+        # check while staying fully sensitive to every other byte,
+        # including mid-file blank lines and trailing whitespace within a
+        # line -- only the absolute end-of-file newline count is ignored.
+        EXPECTED_NORMALIZED_SUM="$(printf '%s' "$(cat "$EXPECTED_TMP" 2>/dev/null)" | file_checksum /dev/stdin 2>/dev/null || echo "EXPECTED_BUILD_FAILED")"
+        LEARNER_NORMALIZED_SUM="$(printf '%s' "$(cat "$CORRECTED" 2>/dev/null)" | file_checksum /dev/stdin 2>/dev/null || echo "LEARNER_READ_FAILED")"
+        rm -f "$EXPECTED_TMP"
+
+        if [[ "$EXPECTED_NORMALIZED_SUM" == "$LEARNER_NORMALIZED_SUM" ]]; then
+          check "staff-list-corrected.txt has all 4 corrections applied, with no other line changed" pass
+        else
+          check "staff-list-corrected.txt has all 4 corrections applied, with no other line changed" fail
+        fi
+      fi
+    else
+      check "staff-list-corrected.txt has all 4 corrections applied, with no other line changed" fail
+    fi
+
+    # 5. wade-in-workshop/CLAUDE.md (the same file Module 01 already created
+    #    at the workshop root -- see docs/workshop-design.md §14 item 5) now
+    #    contains at least 3 of the 4 required section headers, each matched
+    #    as an EXACT whole line (`grep -Fxq`), not a substring -- so the
+    #    file's own pre-existing "## Never touch `checks/`" heading (a
+    #    different, longer line) never accidentally counts as the required
+    #    "## Never touch" header. A case statement, not `declare -A`, per
+    #    this script's own bash-3.2 rule established above.
+    CLAUDE_MD="$ROOT/CLAUDE.md"
+    CLAUDE_LINK_COUNT="$(stat -f '%l' "$CLAUDE_MD" 2>/dev/null || stat -c '%h' "$CLAUDE_MD" 2>/dev/null || echo "1")"
+    if [[ -L "$CLAUDE_MD" ]]; then
+      check "CLAUDE.md has at least 3 of the 4 required house-rules section headers (found a symlink, not a real file)" fail
+    elif [[ -f "$CLAUDE_MD" && "$CLAUDE_LINK_COUNT" != "1" ]]; then
+      check "CLAUDE.md has at least 3 of the 4 required house-rules section headers (found a hard link, not an independently-written file)" fail
+    elif [[ -f "$CLAUDE_MD" ]]; then
+      HEADER_COUNT=0
+      FOUND_HEADERS=()
+      for header in "## About this folder" "## House rules" "## How I like output" "## Never touch"; do
+        if grep -Fxq "$header" "$CLAUDE_MD" 2>/dev/null; then
+          HEADER_COUNT=$((HEADER_COUNT + 1))
+          FOUND_HEADERS+=("$header")
+        fi
+      done
+      if [[ "$HEADER_COUNT" -ge 3 ]]; then
+        check "CLAUDE.md has at least 3 of the 4 required house-rules section headers (found $HEADER_COUNT/4)" pass
+      else
+        check "CLAUDE.md has at least 3 of the 4 required house-rules section headers (found $HEADER_COUNT/4: ${FOUND_HEADERS[*]:-none})" fail
+      fi
+    else
+      check "CLAUDE.md has at least 3 of the 4 required house-rules section headers" fail
+    fi
+
+    # 5b. The Module 01 safety preamble is still present -- found by a
+    #    fresh-context adversarial pass: a session asked to "add sections"
+    #    to CLAUDE.md could plausibly regenerate the whole file instead of
+    #    appending, silently dropping the original "Never touch checks/"
+    #    and "stay inside this folder" instructions while still adding all
+    #    4 new headers cleanly -- reproduced directly, a full 5/5 pass with
+    #    the original safety content entirely gone. This can't prove the
+    #    CONTENT still means what it meant (a determined rewrite could keep
+    #    the heading text and gut the instruction under it, the same
+    #    provenance limit every module's checks already carry) but it does
+    #    catch the specific, plausible accident this module's own task
+    #    invites: the two original headings disappearing outright.
+    if [[ -f "$CLAUDE_MD" && ! -L "$CLAUDE_MD" && "$CLAUDE_LINK_COUNT" == "1" ]]; then
+      SAFETY_PREAMBLE_OK=true
+      for original_header in "## Never touch \`checks/\`" "## Stay inside this folder unless a module says otherwise"; do
+        grep -Fxq "$original_header" "$CLAUDE_MD" 2>/dev/null || SAFETY_PREAMBLE_OK=false
+      done
+      if [[ "$SAFETY_PREAMBLE_OK" == true ]]; then
+        check "CLAUDE.md still has the original Module 01 safety headings (not overwritten)" pass
+      else
+        check "CLAUDE.md still has the original Module 01 safety headings (not overwritten - add your new sections, don't replace the file)" fail
+      fi
+    else
+      check "CLAUDE.md still has the original Module 01 safety headings (not overwritten)" fail
+    fi
+
+    # 6. Own-words answers file: same discipline as Modules 01-02 -- presence-
+    #    checked for genuine content, rejecting the literal placeholder text
+    #    from the module page itself, and rejecting a symlink or hard link
+    #    standing in for a real file.
+    ANSWERS03="$ROOT/03-files/answers.txt"
+    ANSWERS03_LINK_COUNT="$(stat -f '%l' "$ANSWERS03" 2>/dev/null || stat -c '%h' "$ANSWERS03" 2>/dev/null || echo "1")"
+    PLACEHOLDER_RULE03="<one house rule you wrote and what specific Double Deuce filing quirk it responds to>"
+    PLACEHOLDER_CHECK03="<how you checked the corrected file yourself, against the memo, rather than trusting it on sight>"
+    PLACEHOLDER_CHANGE03="<in your own words, what will actually be different about a session's behavior now that CLAUDE.md has these rules>"
+    if [[ "$FILES_DIR_OK" == false ]]; then
+      check "03-files/answers.txt has all three reflection answers, in your own words (03-files/ is a symlink, not a real directory)" fail
+    elif [[ -L "$ANSWERS03" ]]; then
+      check "03-files/answers.txt has all three reflection answers, in your own words (found a symlink, not a real file)" fail
+    elif [[ -f "$ANSWERS03" && "$ANSWERS03_LINK_COUNT" != "1" ]]; then
+      check "03-files/answers.txt has all three reflection answers, in your own words (found a hard link, not an independently-written file)" fail
+    elif [[ -f "$ANSWERS03" ]]; then
+      MISSING_LABELS=()
+      # Bash-3.2-safe case statement, not an associative array -- see the
+      # matching comment on Module 01's identical pattern, above, for why.
+      for label in "HOUSE_RULE:" "WHAT_I_CHECKED:" "WHAT_CHANGES:"; do
+        case "$label" in
+          "HOUSE_RULE:") EXPECTED_PLACEHOLDER="$PLACEHOLDER_RULE03" ;;
+          "WHAT_I_CHECKED:") EXPECTED_PLACEHOLDER="$PLACEHOLDER_CHECK03" ;;
+          "WHAT_CHANGES:") EXPECTED_PLACEHOLDER="$PLACEHOLDER_CHANGE03" ;;
+        esac
+        LINE="$(grep -m1 "^$label" "$ANSWERS03" 2>/dev/null || true)"
+        VALUE="$(echo "$LINE" | sed "s/^$label//" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+        if [[ -z "$VALUE" || "$VALUE" == "$EXPECTED_PLACEHOLDER" ]]; then
+          MISSING_LABELS+=("$label")
+        fi
+      done
+      if [[ "${#MISSING_LABELS[@]}" -eq 0 ]]; then
+        check "03-files/answers.txt has all three reflection answers, in your own words" pass
+      else
+        check "03-files/answers.txt has all three reflection answers, in your own words (still needed: ${MISSING_LABELS[*]})" fail
+      fi
+    else
+      check "03-files/answers.txt has all three reflection answers, in your own words" fail
+    fi
+    ;;
+  04)
+    # 1. 04-scripts/ itself is a real directory, not a symlink standing in
+    #    for one -- same convention as Module 02's 02-meet/ check: a
+    #    symlinked parent would let the required output actually live
+    #    outside the sandbox while still passing every downstream check.
+    EXPECTED_04_SCRIPTS="$ROOT/04-scripts"
+    SCRIPTS_DIR_OK=true
+    if [[ -e "$EXPECTED_04_SCRIPTS" ]]; then
+      REAL_04_SCRIPTS="$(cd "$EXPECTED_04_SCRIPTS" 2>/dev/null && pwd -P || echo "")"
+      if [[ "$REAL_04_SCRIPTS" != "$EXPECTED_04_SCRIPTS" ]]; then
+        SCRIPTS_DIR_OK=false
+      fi
+    fi
+    if [[ "$SCRIPTS_DIR_OK" == true && -d "$EXPECTED_04_SCRIPTS" ]]; then
+      check "04-scripts/ directory exists (not a symlink)" pass
+    else
+      check "04-scripts/ directory exists (not a symlink)" fail
+      SCRIPTS_DIR_OK=false
+    fi
+
+    # 2. 04-scripts/door-report.txt exists for real -- not a symlink, and not
+    #    a hard link either (same discipline as Module 02's summary.txt: this
+    #    file is learner/Claude-Code-authored, not copied from a fixture, so
+    #    any link count above 1 means it's sharing bytes with some other path
+    #    rather than having been written here).
+    REPORT="$ROOT/04-scripts/door-report.txt"
+    REPORT_LINK_COUNT="$(stat -f '%l' "$REPORT" 2>/dev/null || stat -c '%h' "$REPORT" 2>/dev/null || echo "1")"
+    REPORT_OK=false
+    if [[ "$SCRIPTS_DIR_OK" == false ]]; then
+      check "04-scripts/door-report.txt exists and is non-empty (04-scripts/ isn't set up as a real directory yet)" fail
+    elif [[ -L "$REPORT" ]]; then
+      check "04-scripts/door-report.txt exists and is non-empty (found a symlink, not a real file)" fail
+    elif [[ -f "$REPORT" && "$REPORT_LINK_COUNT" != "1" ]]; then
+      check "04-scripts/door-report.txt exists and is non-empty (found a hard link, not an independently-written file)" fail
+    elif [[ -s "$REPORT" ]]; then
+      check "04-scripts/door-report.txt exists and is non-empty" pass
+      REPORT_OK=true
+    else
+      check "04-scripts/door-report.txt exists and is non-empty" fail
+    fi
+
+    # 2b. Some actual script file sits in 04-scripts/ too -- not just the
+    #    report. Found by a fresh-context adversarial review: the module's
+    #    own text promises "04-scripts/ should contain both the script
+    #    itself and door-report.txt," but nothing enforced that half of the
+    #    claim -- a learner (or their session) could hand-type door-report.txt
+    #    directly, never have Claude Code write or run anything, and still
+    #    pass every other check. Reproduced directly: a folder with only
+    #    door-report.txt and answers.txt in it passed 7/7 before this fix.
+    #    This can't prove Claude Code wrote a CORRECT script (the same
+    #    provenance limit named workshop-wide in §8 -- no local check can),
+    #    but it can and should catch the specific case of no script existing
+    #    at all, which is strictly weaker than that limit and was silently
+    #    unguarded. Any regular file other than door-report.txt/answers.txt
+    #    counts -- this workshop doesn't mandate a specific language.
+    SCRIPT_FOUND=false
+    if [[ "$SCRIPTS_DIR_OK" == true ]]; then
+      for f in "$EXPECTED_04_SCRIPTS"/*; do
+        [[ -e "$f" ]] || continue
+        BASE_NAME="$(basename "$f")"
+        if [[ "$BASE_NAME" != "door-report.txt" && "$BASE_NAME" != "answers.txt" && -f "$f" && ! -L "$f" ]]; then
+          SCRIPT_FOUND=true
+          break
+        fi
+      done
+    fi
+    if [[ "$SCRIPT_FOUND" == true ]]; then
+      check "04-scripts/ contains the script itself, not just the report" pass
+    else
+      check "04-scripts/ contains the script itself, not just the report" fail
+    fi
+
+    # 3. All 12 door-count fixtures are unmodified -- checksum-verified
+    #    against the embedded, pinned hashes above (never a checksum
+    #    computed from the live fixture at run time, which would let a
+    #    tampered fixture silently become its own new "pristine" reference --
+    #    the same class of bypass Module 01 and 02's fixture checks already
+    #    guard against). Recomputing TOTAL/BEST/WORST below only happens if
+    #    every fixture passes here; a single tampered or missing fixture
+    #    fails this check AND every downstream figure check, with a "contact
+    #    the workshop" message, rather than quietly computing a wrong answer
+    #    from bad input.
+    DOOR_COUNT_DATES=(2026-08-01 2026-08-02 2026-08-03 2026-08-04 2026-08-05 2026-08-06 2026-08-07 2026-08-08 2026-08-09 2026-08-10 2026-08-11 2026-08-12)
+    FIXTURES_OK=true
+    if [[ "$CHECKSUM_TOOL_AVAILABLE" == false ]]; then
+      check "all 12 door-count fixtures unmodified (couldn't verify: no checksum tool found on this system - contact the workshop)" fail
+      FIXTURES_OK=false
+    else
+      BAD_FIXTURES=()
+      for d in "${DOOR_COUNT_DATES[@]}"; do
+        FPATH="$ROOT/fixtures/door-count-$d.txt"
+        EXPECTED_SUM="$(door_count_expected_sha256 "$d")"
+        ACTUAL_SUM="$(file_checksum "$FPATH" 2>/dev/null || echo "MISSING_FIXTURE")"
+        if [[ "$ACTUAL_SUM" != "$EXPECTED_SUM" ]]; then
+          BAD_FIXTURES+=("door-count-$d.txt")
+        fi
+      done
+      if [[ "${#BAD_FIXTURES[@]}" -eq 0 ]]; then
+        check "all 12 door-count fixtures unmodified (checksum verified)" pass
+      else
+        check "all 12 door-count fixtures unmodified (contact the workshop, not your own mistake - affected: ${BAD_FIXTURES[*]})" fail
+        FIXTURES_OK=false
+      fi
+    fi
+
+    # Recompute the monthly total, best night, and worst night independently
+    # from the pristine fixtures -- never from door-report.txt itself, and
+    # never a hardcoded answer key -- so a wrong script produces a wrong
+    # report and fails here, and this stays correct even if a future fixture
+    # revision changes the real figures.
+    TOTAL_EXPECTED=0
+    BEST_DATE=""; BEST_COUNT=-1
+    WORST_DATE=""; WORST_COUNT=-1
+    if [[ "$FIXTURES_OK" == true ]]; then
+      for d in "${DOOR_COUNT_DATES[@]}"; do
+        FPATH="$ROOT/fixtures/door-count-$d.txt"
+        LINE="$(grep -m1 '^Count:' "$FPATH" 2>/dev/null || true)"
+        N="$(echo "$LINE" | sed 's/^Count:[[:space:]]*//' | sed 's/[[:space:]]*$//')"
+        TOTAL_EXPECTED=$((TOTAL_EXPECTED + N))
+        if [[ "$N" -gt "$BEST_COUNT" ]]; then BEST_COUNT="$N"; BEST_DATE="$d"; fi
+        if [[ "$WORST_COUNT" -eq -1 || "$N" -lt "$WORST_COUNT" ]]; then WORST_COUNT="$N"; WORST_DATE="$d"; fi
+      done
+    fi
+
+    # Helper: read one labeled value out of door-report.txt, exact-trimmed,
+    # no substring or token matching involved -- door-report.txt is a
+    # structured labeled file the learner's script writes (format given
+    # verbatim in the module page), not free prose, so an exact per-label
+    # match is the right tool here and sidesteps the substring-match bug
+    # class Module 02's own review found in its free-text summary check.
+    read_report_label() {
+      local label="$1"
+      [[ "$REPORT_OK" == true ]] || { echo ""; return; }
+      local line
+      line="$(grep -m1 "^$label" "$REPORT" 2>/dev/null || true)"
+      echo "$line" | sed "s/^$label//" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'
+    }
+
+    # 4. The exact monthly total.
+    if [[ "$REPORT_OK" == true && "$FIXTURES_OK" == true ]]; then
+      ACTUAL_TOTAL="$(read_report_label 'TOTAL:')"
+      if [[ "$ACTUAL_TOTAL" == "$TOTAL_EXPECTED" ]]; then
+        check "door-report.txt has the exact monthly total ($TOTAL_EXPECTED)" pass
+      else
+        check "door-report.txt has the exact monthly total (expected $TOTAL_EXPECTED, found '${ACTUAL_TOTAL:-nothing}')" fail
+      fi
+    else
+      check "door-report.txt has the exact monthly total (contact the workshop, not your own mistake)" fail
+    fi
+
+    # 5. The exact best night -- date AND count together, since a report
+    #    with the right count on the wrong date (or vice versa) isn't
+    #    actually correct.
+    if [[ "$REPORT_OK" == true && "$FIXTURES_OK" == true ]]; then
+      ACTUAL_BEST_DATE="$(read_report_label 'BEST_NIGHT_DATE:')"
+      ACTUAL_BEST_COUNT="$(read_report_label 'BEST_NIGHT_COUNT:')"
+      if [[ "$ACTUAL_BEST_DATE" == "$BEST_DATE" && "$ACTUAL_BEST_COUNT" == "$BEST_COUNT" ]]; then
+        check "door-report.txt has the exact best night ($BEST_DATE, $BEST_COUNT)" pass
+      else
+        check "door-report.txt has the exact best night (expected $BEST_DATE / $BEST_COUNT, found '${ACTUAL_BEST_DATE:-nothing}' / '${ACTUAL_BEST_COUNT:-nothing}')" fail
+      fi
+    else
+      check "door-report.txt has the exact best night (contact the workshop, not your own mistake)" fail
+    fi
+
+    # 6. The exact worst night, same discipline as the best night above.
+    if [[ "$REPORT_OK" == true && "$FIXTURES_OK" == true ]]; then
+      ACTUAL_WORST_DATE="$(read_report_label 'WORST_NIGHT_DATE:')"
+      ACTUAL_WORST_COUNT="$(read_report_label 'WORST_NIGHT_COUNT:')"
+      if [[ "$ACTUAL_WORST_DATE" == "$WORST_DATE" && "$ACTUAL_WORST_COUNT" == "$WORST_COUNT" ]]; then
+        check "door-report.txt has the exact worst night ($WORST_DATE, $WORST_COUNT)" pass
+      else
+        check "door-report.txt has the exact worst night (expected $WORST_DATE / $WORST_COUNT, found '${ACTUAL_WORST_DATE:-nothing}' / '${ACTUAL_WORST_COUNT:-nothing}')" fail
+      fi
+    else
+      check "door-report.txt has the exact worst night (contact the workshop, not your own mistake)" fail
+    fi
+
+    # 7. Own-words answers file: same discipline as Modules 01 and 02 --
+    #    presence-checked for genuine content, rejecting the literal
+    #    placeholder text from the module page itself, and rejecting a
+    #    symlink or hard link standing in for a real file.
+    ANSWERS04="$ROOT/04-scripts/answers.txt"
+    ANSWERS04_LINK_COUNT="$(stat -f '%l' "$ANSWERS04" 2>/dev/null || stat -c '%h' "$ANSWERS04" 2>/dev/null || echo "1")"
+    PLACEHOLDER_PLAN04="<did you ask Claude Code for a plan before it wrote the script - what did you ask for?>"
+    PLACEHOLDER_CHECKED04="<which night's figure did you verify by hand against its raw fixture file, and what did you find?>"
+    PLACEHOLDER_NEXT04="<what would you do differently next time you ask Claude Code to write and run a script?>"
+    if [[ "$SCRIPTS_DIR_OK" == false ]]; then
+      check "04-scripts/answers.txt has all three reflection answers, in your own words (04-scripts/ isn't set up as a real directory yet)" fail
+    elif [[ -L "$ANSWERS04" ]]; then
+      check "04-scripts/answers.txt has all three reflection answers, in your own words (found a symlink, not a real file)" fail
+    elif [[ -f "$ANSWERS04" && "$ANSWERS04_LINK_COUNT" != "1" ]]; then
+      check "04-scripts/answers.txt has all three reflection answers, in your own words (found a hard link, not an independently-written file)" fail
+    elif [[ -f "$ANSWERS04" ]]; then
+      MISSING_LABELS=()
+      # Bash-3.2-safe case statement, not an associative array -- see the
+      # matching comment on Module 01/02's identical pattern, above.
+      for label in "PLAN_FIRST:" "CHECKED_BY_HAND:" "WHAT_NEXT_TIME:"; do
+        case "$label" in
+          "PLAN_FIRST:") EXPECTED_PLACEHOLDER="$PLACEHOLDER_PLAN04" ;;
+          "CHECKED_BY_HAND:") EXPECTED_PLACEHOLDER="$PLACEHOLDER_CHECKED04" ;;
+          "WHAT_NEXT_TIME:") EXPECTED_PLACEHOLDER="$PLACEHOLDER_NEXT04" ;;
+        esac
+        LINE="$(grep -m1 "^$label" "$ANSWERS04" 2>/dev/null || true)"
+        VALUE="$(echo "$LINE" | sed "s/^$label//" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+        if [[ -z "$VALUE" || "$VALUE" == "$EXPECTED_PLACEHOLDER" ]]; then
+          MISSING_LABELS+=("$label")
+        fi
+      done
+      if [[ "${#MISSING_LABELS[@]}" -eq 0 ]]; then
+        check "04-scripts/answers.txt has all three reflection answers, in your own words" pass
+      else
+        check "04-scripts/answers.txt has all three reflection answers, in your own words (still needed: ${MISSING_LABELS[*]})" fail
+      fi
+    else
+      check "04-scripts/answers.txt has all three reflection answers, in your own words" fail
+    fi
+    ;;
+  05)
+    # Module 05 is named, in docs/workshop-design.md itself, as this arc's
+    # weakest deterministic tier: real live web research against the real
+    # internet, not a workshop-supplied fixture. This checker is deliberately
+    # [structural-only] -- it verifies the brief's shape and sourcing
+    # discipline (does it exist, does it have the required sections, does it
+    # cite real-looking sources from more than one site, does its comparison
+    # table actually have content in every cell), never whether any specific
+    # price or feature claim is true. That substance is this module's Tier-2
+    # reflection, not something a local script can check against a live,
+    # third-party website without becoming network-dependent itself.
+
+    # 1. 05-research/ itself is a real directory, not a symlink standing in
+    #    for one -- same convention as 02-meet/'s own directory check.
+    EXPECTED_05_RESEARCH="$ROOT/05-research"
+    RESEARCH_DIR_OK=true
+    if [[ -e "$EXPECTED_05_RESEARCH" ]]; then
+      REAL_05_RESEARCH="$(cd "$EXPECTED_05_RESEARCH" 2>/dev/null && pwd -P || echo "")"
+      if [[ "$REAL_05_RESEARCH" != "$EXPECTED_05_RESEARCH" ]]; then
+        RESEARCH_DIR_OK=false
+      fi
+    fi
+
+    # 2. 05-research/comparison-brief.md exists for real -- not a symlink,
+    #    and not a hard link either (checked via link count, the same
+    #    convention as 02-meet/summary.txt, since this file is learner/
+    #    Claude-Code-authored, not copied from a fixture, so there's no
+    #    single reference inode to compare against).
+    BRIEF="$ROOT/05-research/comparison-brief.md"
+    BRIEF_LINK_COUNT="$(stat -f '%l' "$BRIEF" 2>/dev/null || stat -c '%h' "$BRIEF" 2>/dev/null || echo "1")"
+    BRIEF_REAL_FILE=false
+    if [[ "$RESEARCH_DIR_OK" == false ]]; then
+      check "05-research/comparison-brief.md exists and is non-empty (05-research/ is a symlink, not a real directory)" fail
+    elif [[ -L "$BRIEF" ]]; then
+      check "05-research/comparison-brief.md exists and is non-empty (found a symlink, not a real file)" fail
+    elif [[ -f "$BRIEF" && "$BRIEF_LINK_COUNT" != "1" ]]; then
+      check "05-research/comparison-brief.md exists and is non-empty (found a hard link, not an independently-written file)" fail
+    elif [[ -s "$BRIEF" ]]; then
+      check "05-research/comparison-brief.md exists and is non-empty" pass
+      BRIEF_REAL_FILE=true
+    else
+      check "05-research/comparison-brief.md exists and is non-empty" fail
+    fi
+
+    # 3. All 4 required section headers present, verbatim -- a closed set,
+    #    the module's own text names these exact four strings. An ordinary
+    #    indexed array (not `declare -A`) is fine under bash 3.2; only
+    #    associative arrays crash it.
+    REQUIRED_HEADERS=("## Platforms Compared" "## Pricing" "## Features" "## Recommendation")
+    if [[ "$BRIEF_REAL_FILE" == true ]]; then
+      MISSING_HEADERS=()
+      for h in "${REQUIRED_HEADERS[@]}"; do
+        grep -qxF "$h" "$BRIEF" 2>/dev/null || MISSING_HEADERS+=("$h")
+      done
+      if [[ "${#MISSING_HEADERS[@]}" -eq 0 ]]; then
+        check "comparison-brief.md has all 4 required section headers" pass
+      else
+        check "comparison-brief.md has all 4 required section headers (still missing: ${MISSING_HEADERS[*]})" fail
+      fi
+    else
+      check "comparison-brief.md has all 4 required section headers" fail
+    fi
+
+    # 4. At least 3 source URLs from at least 3 distinct SITES -- a count,
+    #    not a pattern match, and not a reachability check (this checker
+    #    makes no network calls of its own; verifying a URL is live is out
+    #    of scope, named honestly in the module text as Part 4's job, not
+    #    this script's). "Site" is approximated as the last two dot-
+    #    separated labels of the hostname (a naive registrable-domain
+    #    guess, not a real public-suffix-list lookup), specifically so
+    #    `www.eventbrite.com` and `checkout.eventbrite.com` count as the
+    #    SAME site as `eventbrite.com` -- found by a fresh-context
+    #    adversarial pass, which cited one real company three times via
+    #    three subdomains and passed "3 distinct sites" while researching
+    #    exactly one platform. A trailing sentence-final period (a bare
+    #    URL with no path, at the end of a sentence, e.g. "...see
+    #    https://eventbrite.com.") is stripped before comparison too --
+    #    the same pass found this turned two real citations of one site
+    #    into an apparent third, from completely ordinary prose, not
+    #    deliberate gaming. Named limit: the last-two-labels heuristic is
+    #    wrong for multi-part public suffixes like `co.uk` (it would treat
+    #    `example.co.uk` as site "co.uk") -- accepted for now since no
+    #    ticketing platform this module expects uses one, not claimed to
+    #    be a general-purpose registrable-domain parser.
+    if [[ "$BRIEF_REAL_FILE" == true ]]; then
+      HOSTNAMES="$(grep -oE 'https?://[A-Za-z0-9.-]+' "$BRIEF" 2>/dev/null \
+        | sed -E 's#^https?://##' \
+        | sed -E 's/\.$//' \
+        | tr '[:upper:]' '[:lower:]' \
+        | awk -F'.' '{if (NF>=2) print $(NF-1)"."$NF; else print $0}' \
+        | sort -u)"
+      HOSTNAME_COUNT="$(printf '%s\n' "$HOSTNAMES" | grep -c '.' || true)"
+      if [[ "$HOSTNAME_COUNT" -ge 3 ]]; then
+        check "comparison-brief.md cites source URLs from at least 3 distinct sites (found $HOSTNAME_COUNT)" pass
+      else
+        check "comparison-brief.md cites source URLs from at least 3 distinct sites (found $HOSTNAME_COUNT)" fail
+      fi
+    else
+      check "comparison-brief.md cites source URLs from at least 3 distinct sites" fail
+    fi
+
+    # 5. A comparison table exists, INSIDE THE PRICING SECTION SPECIFICALLY,
+    #    with at least 3 data rows (plus a header row, so at least 4 pipe-
+    #    delimited content rows total) and no empty cells in any of them --
+    #    a reasonable structural proxy for "every claim row in the required
+    #    comparison table non-empty," per docs/workshop-design.md §7,
+    #    without trying to validate that any individual cell's content is
+    #    factually correct.
+    #    Scoping to the Pricing section (from its own header to the next
+    #    "## " header, or end of file) is itself a fix: a fresh-context
+    #    adversarial pass found the original version scanned the WHOLE
+    #    document, so an unrelated decorative table anywhere else (e.g.
+    #    stray notes under Features) could either falsely PASS a brief with
+    #    no real Pricing table at all, or falsely FAIL a perfectly correct
+    #    Pricing table over one unrelated blank cell somewhere else in the
+    #    file -- both reproduced directly.
+    #    A markdown table row matches (after trimming leading whitespace,
+    #    since a table indented under a list item or reformatted with a
+    #    couple of leading spaces is still valid Markdown and was
+    #    demonstrated to be silently rejected by a stricter
+    #    column-zero-only version of this regex) `^\|.*\|[[:space:]]*$`;
+    #    its separator row (the `|---|---|---|` line under the header) is
+    #    told apart from a real content row by stripping every `|`, `:`,
+    #    `*`, `-`, and space character from the line and checking whether
+    #    anything is left -- a separator row has nothing left, a real row
+    #    (even one made mostly of dashes and colons in its actual text)
+    #    still does. A single-regex version of this same idea was tried
+    #    first and was wrong: it only matched between the FIRST and LAST
+    #    pipe on the line, so a real 4-column separator (three internal
+    #    pipes) never matched at all and the check failed a perfectly
+    #    correct table -- caught by running this check against a real,
+    #    honestly-written table, not by reading the regex.
+    if [[ "$BRIEF_REAL_FILE" == true ]]; then
+      PRICING_SECTION="$(awk '/^## Pricing[[:space:]]*$/{flag=1; next} /^## /{flag=0} flag' "$BRIEF" 2>/dev/null)"
+      TABLE_LINES="$(printf '%s\n' "$PRICING_SECTION" | grep -E '^[[:space:]]*\|.*\|[[:space:]]*$' 2>/dev/null || true)"
+      CONTENT_ROWS=0
+      EMPTY_CELL_ROWS=0
+      HAS_SEPARATOR=false
+      while IFS= read -r raw_line; do
+        [[ -z "$raw_line" ]] && continue
+        line="$(printf '%s' "$raw_line" | sed 's/^[[:space:]]*//')"
+        STRIPPED="$(printf '%s' "$line" | sed 's/[|:*[:space:]-]//g')"
+        if [[ -z "$STRIPPED" ]]; then
+          HAS_SEPARATOR=true
+          continue
+        fi
+        CONTENT_ROWS=$((CONTENT_ROWS + 1))
+        INNER="${line#|}"
+        INNER="${INNER%|}"
+        ROW_EMPTY=false
+        OLDIFS="$IFS"
+        IFS='|'
+        read -ra CELLS <<< "$INNER"
+        IFS="$OLDIFS"
+        for cell in "${CELLS[@]}"; do
+          TRIMMED="$(printf '%s' "$cell" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+          [[ -z "$TRIMMED" ]] && ROW_EMPTY=true
+        done
+        if [[ "$ROW_EMPTY" == true ]]; then
+          EMPTY_CELL_ROWS=$((EMPTY_CELL_ROWS + 1))
+        fi
+      done <<< "$TABLE_LINES"
+      if [[ "$HAS_SEPARATOR" == true && "$CONTENT_ROWS" -ge 4 && "$EMPTY_CELL_ROWS" -eq 0 ]]; then
+        check "comparison-brief.md has a comparison table with at least 3 rows and no empty cells" pass
+      else
+        check "comparison-brief.md has a comparison table with at least 3 rows and no empty cells" fail
+      fi
+    else
+      check "comparison-brief.md has a comparison table with at least 3 rows and no empty cells" fail
+    fi
+
+    # 6. Own-words answers file: same discipline as every earlier module --
+    #    presence-checked for genuine content, rejecting the literal
+    #    placeholder text from the module page itself, and rejecting a
+    #    symlink or hard link standing in for a real file.
+    ANSWERS05="$ROOT/05-research/answers.txt"
+    ANSWERS05_LINK_COUNT="$(stat -f '%l' "$ANSWERS05" 2>/dev/null || stat -c '%h' "$ANSWERS05" 2>/dev/null || echo "1")"
+    PLACEHOLDER_SOURCES05="<did you open at least one cited page yourself and compare it to what the brief says? what did you find?>"
+    PLACEHOLDER_DISAGREE05="<did the sources disagree with each other about anything, or did Claude Code's first answer turn out to be wrong once you checked? what happened?>"
+    PLACEHOLDER_CONFIDENCE05="<how much would you trust this brief if you were handing it to Tilghman today, and what would you still want to double-check?>"
+    if [[ "$RESEARCH_DIR_OK" == false ]]; then
+      check "05-research/answers.txt has all three reflection answers, in your own words (05-research/ is a symlink, not a real directory)" fail
+    elif [[ -L "$ANSWERS05" ]]; then
+      check "05-research/answers.txt has all three reflection answers, in your own words (found a symlink, not a real file)" fail
+    elif [[ -f "$ANSWERS05" && "$ANSWERS05_LINK_COUNT" != "1" ]]; then
+      check "05-research/answers.txt has all three reflection answers, in your own words (found a hard link, not an independently-written file)" fail
+    elif [[ -f "$ANSWERS05" ]]; then
+      MISSING_LABELS=()
+      # Bash-3.2-safe case statement, not an associative array -- see the
+      # matching comment on Module 01's identical pattern, above, for why.
+      for label in "SOURCES_CHECKED:" "DISAGREEMENT:" "CONFIDENCE:"; do
+        case "$label" in
+          "SOURCES_CHECKED:") EXPECTED_PLACEHOLDER="$PLACEHOLDER_SOURCES05" ;;
+          "DISAGREEMENT:") EXPECTED_PLACEHOLDER="$PLACEHOLDER_DISAGREE05" ;;
+          "CONFIDENCE:") EXPECTED_PLACEHOLDER="$PLACEHOLDER_CONFIDENCE05" ;;
+        esac
+        LINE="$(grep -m1 "^$label" "$ANSWERS05" 2>/dev/null || true)"
+        VALUE="$(echo "$LINE" | sed "s/^$label//" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+        if [[ -z "$VALUE" || "$VALUE" == "$EXPECTED_PLACEHOLDER" ]]; then
+          MISSING_LABELS+=("$label")
+        fi
+      done
+      if [[ "${#MISSING_LABELS[@]}" -eq 0 ]]; then
+        check "05-research/answers.txt has all three reflection answers, in your own words" pass
+      else
+        check "05-research/answers.txt has all three reflection answers, in your own words (still needed: ${MISSING_LABELS[*]})" fail
+      fi
+    else
+      check "05-research/answers.txt has all three reflection answers, in your own words" fail
+    fi
+    ;;
+  06)
+    # 1. 06-docs/ itself is a real directory, not a symlink standing in for
+    #    one -- same convention as Module 02's 02-meet/ check.
+    EXPECTED_06_DOCS="$ROOT/06-docs"
+    DOCS_DIR_OK=true
+    if [[ -e "$EXPECTED_06_DOCS" ]]; then
+      REAL_06_DOCS="$(cd "$EXPECTED_06_DOCS" 2>/dev/null && pwd -P || echo "")"
+      if [[ "$REAL_06_DOCS" != "$EXPECTED_06_DOCS" ]]; then
+        DOCS_DIR_OK=false
+      fi
+    fi
+
+    # 2. 06-docs/monthly-summary.md exists for real -- not a symlink, and not
+    #    a hard link either (checked via link count, same reasoning as
+    #    Module 02's summary.txt check: this file is learner/Claude-Code-
+    #    authored, not copied from a fixture, so a freshly written file never
+    #    shares an inode with anything else).
+    DOC="$ROOT/06-docs/monthly-summary.md"
+    DOC_LINK_COUNT="$(stat -f '%l' "$DOC" 2>/dev/null || stat -c '%h' "$DOC" 2>/dev/null || echo "1")"
+    if [[ "$DOCS_DIR_OK" == false ]]; then
+      check "06-docs/monthly-summary.md exists and is non-empty (06-docs/ is a symlink, not a real directory)" fail
+    elif [[ -L "$DOC" ]]; then
+      check "06-docs/monthly-summary.md exists and is non-empty (found a symlink, not a real file)" fail
+    elif [[ -f "$DOC" && "$DOC_LINK_COUNT" != "1" ]]; then
+      check "06-docs/monthly-summary.md exists and is non-empty (found a hard link, not an independently-written file)" fail
+    elif [[ -s "$DOC" ]]; then
+      check "06-docs/monthly-summary.md exists and is non-empty" pass
+    else
+      check "06-docs/monthly-summary.md exists and is non-empty" fail
+    fi
+    DOC_REAL_FILE=false
+    [[ "$DOCS_DIR_OK" == true && -f "$DOC" && ! -L "$DOC" && "$DOC_LINK_COUNT" == "1" && -s "$DOC" ]] && DOC_REAL_FILE=true
+
+    # 3. Word count within the stated bounds (150-400 words), counted the
+    #    same plain way `wc -w` counts -- whitespace-separated tokens across
+    #    the whole file, headers included, matching what the module page
+    #    tells the learner to aim for.
+    if [[ "$DOC_REAL_FILE" == true ]]; then
+      WORD_COUNT="$(wc -w < "$DOC" 2>/dev/null | tr -d '[:space:]')"
+      if [[ "$WORD_COUNT" =~ ^[0-9]+$ ]] && [[ "$WORD_COUNT" -ge 150 && "$WORD_COUNT" -le 400 ]]; then
+        check "monthly-summary.md is 150-400 words long (found $WORD_COUNT)" pass
+      else
+        check "monthly-summary.md is 150-400 words long (found ${WORD_COUNT:-0})" fail
+      fi
+    else
+      check "monthly-summary.md is 150-400 words long" fail
+    fi
+
+    # 4-7. The monthly total (recomputed by THIS SCRIPT as the sum of the
+    #    fixture's four weekly figures -- never an embedded key, so the
+    #    check stays correct if the fixture's own figures ever change) and
+    #    three further figures (bar tab total, door revenue total, events
+    #    held), all read directly from the fixture. The fixture is checksum-
+    #    verified first -- same defense as Modules 01 and 02's own fixtures:
+    #    a tampered fixture (e.g. edited to inflate a weekly figure) must not
+    #    let the checker faithfully "verify" a summary against the tampered
+    #    value instead of the real one.
+    #    Figure matching extracts every run of digits (with an optional
+    #    leading `$` and optional interior commas, both stripped before
+    #    comparing) from the document and requires an EXACT match against
+    #    the canonical digit string -- not a substring match, which (per
+    #    Module 02's own documented bug) would let a longer nearby figure
+    #    like "$127,845" wrongly appear to contain "$27,845".
+    RAW_NUMBERS_FIXTURE="$ROOT/fixtures/monthly-raw-numbers.txt"
+    RAW_NUMBERS_SUM="$(file_checksum "$RAW_NUMBERS_FIXTURE" 2>/dev/null || echo "MISSING_FIXTURE")"
+    if [[ "$RAW_NUMBERS_SUM" != "$EXPECTED_MONTHLY_RAW_NUMBERS_SHA256" ]]; then
+      check "monthly-summary.md includes the exact monthly total (workshop fixture doesn't match its expected content - contact the workshop, not your own mistake)" fail
+      check "monthly-summary.md includes the bar tab total (workshop fixture doesn't match its expected content - contact the workshop, not your own mistake)" fail
+      check "monthly-summary.md includes the door revenue total (workshop fixture doesn't match its expected content - contact the workshop, not your own mistake)" fail
+      check "monthly-summary.md includes the number of events held (workshop fixture doesn't match its expected content - contact the workshop, not your own mistake)" fail
+    else
+      WEEK_1="$(grep -oE 'Week 1 revenue: \$[0-9,]+' "$RAW_NUMBERS_FIXTURE" 2>/dev/null | grep -oE '[0-9,]+$' | tr -d ',')"
+      WEEK_2="$(grep -oE 'Week 2 revenue: \$[0-9,]+' "$RAW_NUMBERS_FIXTURE" 2>/dev/null | grep -oE '[0-9,]+$' | tr -d ',')"
+      WEEK_3="$(grep -oE 'Week 3 revenue: \$[0-9,]+' "$RAW_NUMBERS_FIXTURE" 2>/dev/null | grep -oE '[0-9,]+$' | tr -d ',')"
+      WEEK_4="$(grep -oE 'Week 4 revenue: \$[0-9,]+' "$RAW_NUMBERS_FIXTURE" 2>/dev/null | grep -oE '[0-9,]+$' | tr -d ',')"
+      BAR_TOTAL="$(grep -oE 'Bar tab total for the month: \$[0-9,]+' "$RAW_NUMBERS_FIXTURE" 2>/dev/null | grep -oE '[0-9,]+$' | tr -d ',')"
+      DOOR_TOTAL="$(grep -oE 'Door revenue total for the month: \$[0-9,]+' "$RAW_NUMBERS_FIXTURE" 2>/dev/null | grep -oE '[0-9,]+$' | tr -d ',')"
+      EVENTS_HELD="$(grep -oE 'Events held this month: [0-9]+' "$RAW_NUMBERS_FIXTURE" 2>/dev/null | grep -oE '[0-9]+$')"
+      if [[ -z "$WEEK_1" || -z "$WEEK_2" || -z "$WEEK_3" || -z "$WEEK_4" || -z "$BAR_TOTAL" || -z "$DOOR_TOTAL" || -z "$EVENTS_HELD" ]]; then
+        check "monthly-summary.md includes the exact monthly total (couldn't read the raw figures from the workshop fixture - contact the workshop)" fail
+        check "monthly-summary.md includes the bar tab total (couldn't read it from the workshop fixture - contact the workshop)" fail
+        check "monthly-summary.md includes the door revenue total (couldn't read it from the workshop fixture - contact the workshop)" fail
+        check "monthly-summary.md includes the number of events held (couldn't read it from the workshop fixture - contact the workshop)" fail
+      else
+        MONTHLY_TOTAL=$((WEEK_1 + WEEK_2 + WEEK_3 + WEEK_4))
+        if [[ "$DOC_REAL_FILE" == true ]]; then
+          DOC_NUMBER_TOKENS="$(grep -oE '\$?[0-9][0-9,]*' "$DOC" 2>/dev/null | tr -d '$,')"
+        else
+          DOC_NUMBER_TOKENS=""
+        fi
+        if [[ "$DOC_REAL_FILE" == true ]] && echo "$DOC_NUMBER_TOKENS" | grep -qxF "$MONTHLY_TOTAL"; then
+          check "monthly-summary.md includes the exact monthly total (\$$MONTHLY_TOTAL)" pass
+        else
+          check "monthly-summary.md includes the exact monthly total (\$$MONTHLY_TOTAL)" fail
+        fi
+        if [[ "$DOC_REAL_FILE" == true ]] && echo "$DOC_NUMBER_TOKENS" | grep -qxF "$BAR_TOTAL"; then
+          check "monthly-summary.md includes the bar tab total (\$$BAR_TOTAL)" pass
+        else
+          check "monthly-summary.md includes the bar tab total (\$$BAR_TOTAL)" fail
+        fi
+        if [[ "$DOC_REAL_FILE" == true ]] && echo "$DOC_NUMBER_TOKENS" | grep -qxF "$DOOR_TOTAL"; then
+          check "monthly-summary.md includes the door revenue total (\$$DOOR_TOTAL)" pass
+        else
+          check "monthly-summary.md includes the door revenue total (\$$DOOR_TOTAL)" fail
+        fi
+        # Events-held gets a stricter check than the three dollar totals: a
+        # small, common integer like this one collides constantly with
+        # unrelated numbers in ordinary prose (a date, "the 19th," a list
+        # count) -- found by a fresh-context adversarial pass, which built
+        # a real document that never states the events-held figure at all
+        # but happened to mention "the 19th" elsewhere, and passed anyway.
+        # Requiring the number to appear on the same LINE as the word
+        # "event" (case-insensitive) is a real, meaningful tightening, not
+        # a complete fix -- a line that mentions "event" AND some other
+        # unrelated number would still false-accept -- but it closes the
+        # specific, demonstrated false pass and is a named, accepted limit
+        # rather than a claim of full semantic verification.
+        if [[ "$DOC_REAL_FILE" == true ]]; then
+          EVENT_LINE_TOKENS="$(grep -iE 'event' "$DOC" 2>/dev/null | grep -oE '\$?[0-9][0-9,]*' | tr -d '$,')"
+        else
+          EVENT_LINE_TOKENS=""
+        fi
+        if [[ "$DOC_REAL_FILE" == true ]] && echo "$EVENT_LINE_TOKENS" | grep -qxF "$EVENTS_HELD"; then
+          check "monthly-summary.md includes the number of events held ($EVENTS_HELD)" pass
+        else
+          check "monthly-summary.md includes the number of events held ($EVENTS_HELD)" fail
+        fi
+      fi
+    fi
+
+    # 8. All 5 required section headers present verbatim -- a closed set,
+    #    each checked as an exact whole-line match (not a substring, so a
+    #    header buried mid-sentence or missing its own line doesn't count).
+    #    A plain indexed array, not `declare -A` -- see the standing note on
+    #    Modules 01/02's identical discipline, above: stock macOS bash 3.2
+    #    has no associative arrays, but ordinary indexed arrays work fine.
+    REQUIRED_HEADERS=("## Summary" "## Revenue Breakdown" "## Notable Items" "## Comparison to Prior Month" "## Prepared By")
+    MISSING_HEADERS=()
+    if [[ "$DOC_REAL_FILE" == true ]]; then
+      for header in "${REQUIRED_HEADERS[@]}"; do
+        if ! grep -qxF "$header" "$DOC" 2>/dev/null; then
+          MISSING_HEADERS+=("$header")
+        fi
+      done
+    else
+      MISSING_HEADERS=("${REQUIRED_HEADERS[@]}")
+    fi
+    if [[ "${#MISSING_HEADERS[@]}" -eq 0 ]]; then
+      check "monthly-summary.md has all 5 required section headers, written exactly as specified" pass
+    else
+      check "monthly-summary.md has all 5 required section headers, written exactly as specified (still missing: ${MISSING_HEADERS[*]})" fail
+    fi
+
+    # 9. Own-words answers file: same discipline as every module before this
+    #    one -- presence-checked for genuine content, rejecting the literal
+    #    placeholder text from the module page itself, and rejecting a
+    #    symlink or hard link standing in for a real file.
+    ANSWERS06="$ROOT/06-docs/answers.txt"
+    ANSWERS06_LINK_COUNT="$(stat -f '%l' "$ANSWERS06" 2>/dev/null || stat -c '%h' "$ANSWERS06" 2>/dev/null || echo "1")"
+    PLACEHOLDER_READS06="<does the document read like something you'd hand an accountant, or like your own working notes with headers added - and what would you change?>"
+    PLACEHOLDER_VERIFIED06="<specifically, how did you check the figures yourself before trusting the draft?>"
+    PLACEHOLDER_NOTICES06="<in your own words, what's the actual risk if one figure in a document like this is wrong?>"
+    if [[ "$DOCS_DIR_OK" == false ]]; then
+      check "06-docs/answers.txt has all three reflection answers, in your own words (06-docs/ is a symlink, not a real directory)" fail
+    elif [[ -L "$ANSWERS06" ]]; then
+      check "06-docs/answers.txt has all three reflection answers, in your own words (found a symlink, not a real file)" fail
+    elif [[ -f "$ANSWERS06" && "$ANSWERS06_LINK_COUNT" != "1" ]]; then
+      check "06-docs/answers.txt has all three reflection answers, in your own words (found a hard link, not an independently-written file)" fail
+    elif [[ -f "$ANSWERS06" ]]; then
+      MISSING_LABELS=()
+      # Bash-3.2-safe case statement, not an associative array -- see the
+      # matching comment on Modules 01/02's identical pattern, above.
+      for label in "READS_LIKE_A_SUMMARY:" "VERIFIED_HOW:" "WHAT_CARL_NOTICES:"; do
+        case "$label" in
+          "READS_LIKE_A_SUMMARY:") EXPECTED_PLACEHOLDER="$PLACEHOLDER_READS06" ;;
+          "VERIFIED_HOW:") EXPECTED_PLACEHOLDER="$PLACEHOLDER_VERIFIED06" ;;
+          "WHAT_CARL_NOTICES:") EXPECTED_PLACEHOLDER="$PLACEHOLDER_NOTICES06" ;;
+        esac
+        LINE="$(grep -m1 "^$label" "$ANSWERS06" 2>/dev/null || true)"
+        VALUE="$(echo "$LINE" | sed "s/^$label//" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+        if [[ -z "$VALUE" || "$VALUE" == "$EXPECTED_PLACEHOLDER" ]]; then
+          MISSING_LABELS+=("$label")
+        fi
+      done
+      if [[ "${#MISSING_LABELS[@]}" -eq 0 ]]; then
+        check "06-docs/answers.txt has all three reflection answers, in your own words" pass
+      else
+        check "06-docs/answers.txt has all three reflection answers, in your own words (still needed: ${MISSING_LABELS[*]})" fail
+      fi
+    else
+      check "06-docs/answers.txt has all three reflection answers, in your own words" fail
+    fi
+    ;;
+  07)
+    # Module 07: Penny's Ledger. Merge two overlapping bookings CSVs under a
+    # stated rule -- Penny's copy is authoritative for any booking ID
+    # present in both files (she's the current owner; Garrett's copy is the
+    # stale one) -- add a total_due column, and prove nothing was lost or
+    # invented. Ground truth is recomputed from the two pristine fixtures at
+    # check time, never read from an embedded key, so this only passes if
+    # the merge was genuinely done. Same no-`declare -A` discipline as every
+    # case above: every lookup uses a plain indexed array plus
+    # `array_index_of` (defined near the top of this script), guarded
+    # against the empty-array `set -u` bug noted there.
+
+    PENNY_FIXTURE="$ROOT/fixtures/penny-bookings.csv"
+    GARRETT_FIXTURE="$ROOT/fixtures/garrett-bookings.csv"
+    OUTPUT_DIR="$ROOT/07-csv"
+    OUTPUT_FILE="$OUTPUT_DIR/bookings-clean.csv"
+    REQUIRED_HEADER="booking_id,name,event_date,deposit,balance,total_due"
+
+    # 1. Fixture integrity: both source CSVs match their pinned checksums.
+    #    Checked first so every downstream check can say plainly whether a
+    #    failure is the learner's or a corrupted/tampered fixture's -- the
+    #    same discipline as Module 01/02's fixture checks, applied to two
+    #    fixtures instead of one.
+    FIXTURES_OK=true
+    PENNY_SUM="$(file_checksum "$PENNY_FIXTURE" 2>/dev/null || echo "MISSING_FIXTURE")"
+    GARRETT_SUM="$(file_checksum "$GARRETT_FIXTURE" 2>/dev/null || echo "MISSING_FIXTURE")"
+    if [[ "$PENNY_SUM" != "$EXPECTED_PENNY_BOOKINGS_SHA256" || "$GARRETT_SUM" != "$EXPECTED_GARRETT_BOOKINGS_SHA256" ]]; then
+      FIXTURES_OK=false
+      check "workshop fixtures penny-bookings.csv and garrett-bookings.csv match their expected content (contact the workshop, not your own mistake)" fail
+    else
+      check "workshop fixtures penny-bookings.csv and garrett-bookings.csv match their expected content" pass
+    fi
+
+    # 2. 07-csv/ is a real directory (not a symlink standing in for one --
+    #    same bypass class as Module 02's 02-meet/ check, reproduced there
+    #    with a symlinked parent redirecting outside the sandbox) and
+    #    bookings-clean.csv is a real file inside it: not a symlink, and not
+    #    a hard link either (a freshly-merged file never shares an inode
+    #    with anything else on a first write).
+    OUTPUT_DIR_OK=true
+    if [[ -e "$OUTPUT_DIR" ]]; then
+      REAL_OUTPUT_DIR="$(cd "$OUTPUT_DIR" 2>/dev/null && pwd -P || echo "")"
+      if [[ "$REAL_OUTPUT_DIR" != "$OUTPUT_DIR" ]]; then
+        OUTPUT_DIR_OK=false
+      fi
+    else
+      OUTPUT_DIR_OK=false
+    fi
+    OUTPUT_LINK_COUNT="$(stat -f '%l' "$OUTPUT_FILE" 2>/dev/null || stat -c '%h' "$OUTPUT_FILE" 2>/dev/null || echo "1")"
+    LEARNER_FILE_OK=false
+    if [[ "$OUTPUT_DIR_OK" == false ]]; then
+      check "07-csv/bookings-clean.csv exists (07-csv/ is a symlink, not a real directory)" fail
+    elif [[ -L "$OUTPUT_FILE" ]]; then
+      check "07-csv/bookings-clean.csv exists (found a symlink, not a real file)" fail
+    elif [[ -f "$OUTPUT_FILE" && "$OUTPUT_LINK_COUNT" != "1" ]]; then
+      check "07-csv/bookings-clean.csv exists (found a hard link, not an independently-written file)" fail
+    elif [[ -s "$OUTPUT_FILE" ]]; then
+      check "07-csv/bookings-clean.csv exists and is non-empty" pass
+      LEARNER_FILE_OK=true
+    else
+      check "07-csv/bookings-clean.csv exists and is non-empty" fail
+    fi
+
+    # 3. The exact required header row, given to the learner verbatim up
+    #    front in the module itself -- an exact string match, not a loose
+    #    one (a reordered or renamed column is not the required header).
+    if [[ "$LEARNER_FILE_OK" == true ]]; then
+      ACTUAL_HEADER="$(sed -n '1p' "$OUTPUT_FILE" 2>/dev/null)"
+      ACTUAL_HEADER="${ACTUAL_HEADER%$'\r'}"
+      # Compare column-by-column, each trimmed, not the raw header string --
+      # same reasoning as trim_field above: "booking_id, name, ..." (a space
+      # after the comma) is the same header to a human as "booking_id,name",
+      # and this module never taught CSV syntax closely enough to make that
+      # distinction load-bearing.
+      ACTUAL_HEADER_TRIMMED="$(printf '%s' "$ACTUAL_HEADER" | awk -F',' '{for(i=1;i<=NF;i++){gsub(/^[ \t]+|[ \t]+$/,"",$i)}; out=$1; for(i=2;i<=NF;i++){out=out","$i}; print out}')"
+      if [[ "$ACTUAL_HEADER_TRIMMED" == "$REQUIRED_HEADER" ]]; then
+        check "bookings-clean.csv has the exact required header row" pass
+      else
+        check "bookings-clean.csv has the exact required header row" fail
+      fi
+    else
+      check "bookings-clean.csv has the exact required header row" fail
+    fi
+
+    # 4. Recompute the true merged set from the two pristine fixtures.
+    #    Garrett's file is read first as the base layer; Penny's file is
+    #    read second and overwrites any ID it shares with Garrett's (her
+    #    copy is authoritative on conflict -- she's the current owner) and
+    #    adds any ID that's hers alone. This IS the merge rule the checker
+    #    enforces, recomputed from pristine fixtures every run, not a hidden
+    #    embedded key.
+    EXPECTED_IDS=()
+    EXPECTED_NAME=()
+    EXPECTED_DATE=()
+    EXPECTED_DEPOSIT=()
+    EXPECTED_BALANCE=()
+    if [[ "$FIXTURES_OK" == true ]]; then
+      for SRC in "$GARRETT_FIXTURE" "$PENNY_FIXTURE"; do
+        FIRST_LINE=true
+        while IFS=',' read -r f_id f_name f_date f_deposit f_balance; do
+          if [[ "$FIRST_LINE" == true ]]; then
+            FIRST_LINE=false
+            continue
+          fi
+          f_id="${f_id%$'\r'}"
+          f_balance="${f_balance%$'\r'}"
+          [[ -z "$f_id" ]] && continue
+          IDX="-1"
+          if [[ "${#EXPECTED_IDS[@]}" -gt 0 ]]; then
+            IDX="$(array_index_of "$f_id" "${EXPECTED_IDS[@]}")"
+          fi
+          if [[ "$IDX" -ge 0 ]]; then
+            EXPECTED_NAME[$IDX]="$f_name"
+            EXPECTED_DATE[$IDX]="$f_date"
+            EXPECTED_DEPOSIT[$IDX]="$f_deposit"
+            EXPECTED_BALANCE[$IDX]="$f_balance"
+          else
+            EXPECTED_IDS+=("$f_id")
+            EXPECTED_NAME+=("$f_name")
+            EXPECTED_DATE+=("$f_date")
+            EXPECTED_DEPOSIT+=("$f_deposit")
+            EXPECTED_BALANCE+=("$f_balance")
+          fi
+        done < "$SRC"
+      done
+    fi
+    EXPECTED_COUNT="${#EXPECTED_IDS[@]}"
+
+    # 5. Parse the learner's own output into matching arrays, preserving
+    #    every row exactly as found (including a duplicate, if there is
+    #    one) so the checks below can catch a duplicate or a dropped row
+    #    instead of silently deduping the learner's own mistake away.
+    ACTUAL_IDS=()
+    ACTUAL_NAME=()
+    ACTUAL_DATE=()
+    ACTUAL_DEPOSIT=()
+    ACTUAL_BALANCE=()
+    ACTUAL_TOTAL=()
+    if [[ "$LEARNER_FILE_OK" == true ]]; then
+      FIRST_LINE=true
+      while IFS=',' read -r a_id a_name a_date a_deposit a_balance a_total; do
+        if [[ "$FIRST_LINE" == true ]]; then
+          FIRST_LINE=false
+          continue
+        fi
+        a_total="${a_total%$'\r'}"
+        a_id="$(trim_field "$a_id")"
+        a_name="$(trim_field "$a_name")"
+        a_date="$(trim_field "$a_date")"
+        a_deposit="$(trim_field "$a_deposit")"
+        a_balance="$(trim_field "$a_balance")"
+        a_total="$(trim_field "$a_total")"
+        if [[ -z "$a_id" && -z "$a_name" && -z "$a_date" && -z "$a_deposit" && -z "$a_balance" && -z "$a_total" ]]; then
+          continue
+        fi
+        ACTUAL_IDS+=("$a_id")
+        ACTUAL_NAME+=("$a_name")
+        ACTUAL_DATE+=("$a_date")
+        ACTUAL_DEPOSIT+=("$a_deposit")
+        ACTUAL_BALANCE+=("$a_balance")
+        ACTUAL_TOTAL+=("$a_total")
+      done < "$OUTPUT_FILE"
+    fi
+    ACTUAL_COUNT="${#ACTUAL_IDS[@]}"
+
+    # 6. Row count equals the checker's own recomputed post-dedup count.
+    if [[ "$FIXTURES_OK" == true && "$LEARNER_FILE_OK" == true && "$ACTUAL_COUNT" -eq "$EXPECTED_COUNT" ]]; then
+      check "row count matches the recomputed post-dedup count ($EXPECTED_COUNT)" pass
+    else
+      check "row count matches the recomputed post-dedup count ($EXPECTED_COUNT, found $ACTUAL_COUNT)" fail
+    fi
+
+    # 7. Closed-set comparison: the booking-ID set in bookings-clean.csv
+    #    exactly equals the recomputed expected set -- no lost rows (an
+    #    expected ID missing from the learner's file) and no invented rows
+    #    (a learner ID that doesn't correspond to any real booking in either
+    #    fixture). Checked both directions, index-based rather than array-
+    #    expansion-based throughout, so a zero-length array on either side
+    #    never gets expanded directly under this script's `set -u`.
+    ID_SET_OK=true
+    if [[ "$FIXTURES_OK" != true || "$LEARNER_FILE_OK" != true ]]; then
+      ID_SET_OK=false
+    else
+      i=0
+      while [[ $i -lt $EXPECTED_COUNT ]]; do
+        eid="${EXPECTED_IDS[$i]}"
+        IDX="-1"
+        if [[ "${#ACTUAL_IDS[@]}" -gt 0 ]]; then
+          IDX="$(array_index_of "$eid" "${ACTUAL_IDS[@]}")"
+        fi
+        [[ "$IDX" -lt 0 ]] && ID_SET_OK=false
+        i=$((i + 1))
+      done
+      i=0
+      while [[ $i -lt $ACTUAL_COUNT ]]; do
+        aid="${ACTUAL_IDS[$i]}"
+        IDX="-1"
+        if [[ "${#EXPECTED_IDS[@]}" -gt 0 ]]; then
+          IDX="$(array_index_of "$aid" "${EXPECTED_IDS[@]}")"
+        fi
+        [[ "$IDX" -lt 0 ]] && ID_SET_OK=false
+        i=$((i + 1))
+      done
+    fi
+    if [[ "$ID_SET_OK" == true ]]; then
+      check "the booking-ID set exactly matches the recomputed expected set (no lost rows, no invented rows)" pass
+    else
+      check "the booking-ID set exactly matches the recomputed expected set (no lost rows, no invented rows)" fail
+    fi
+
+    # 8. For every surviving ID, name/event_date/deposit/balance exactly
+    #    match that ID's source-of-truth value under the stated merge rule
+    #    (Penny's copy wins on conflict) -- exact string comparison, not a
+    #    substring or a loose numeric comparison.
+    FIELDS_OK=true
+    if [[ "$FIXTURES_OK" != true || "$LEARNER_FILE_OK" != true || "$ID_SET_OK" != true ]]; then
+      FIELDS_OK=false
+    else
+      i=0
+      while [[ $i -lt $EXPECTED_COUNT ]]; do
+        eid="${EXPECTED_IDS[$i]}"
+        IDX="-1"
+        if [[ "${#ACTUAL_IDS[@]}" -gt 0 ]]; then
+          IDX="$(array_index_of "$eid" "${ACTUAL_IDS[@]}")"
+        fi
+        if [[ "$IDX" -lt 0 ]]; then
+          FIELDS_OK=false
+        else
+          [[ "${ACTUAL_NAME[$IDX]}" != "${EXPECTED_NAME[$i]}" ]] && FIELDS_OK=false
+          [[ "${ACTUAL_DATE[$IDX]}" != "${EXPECTED_DATE[$i]}" ]] && FIELDS_OK=false
+          [[ "${ACTUAL_DEPOSIT[$IDX]}" != "${EXPECTED_DEPOSIT[$i]}" ]] && FIELDS_OK=false
+          [[ "${ACTUAL_BALANCE[$IDX]}" != "${EXPECTED_BALANCE[$i]}" ]] && FIELDS_OK=false
+        fi
+        i=$((i + 1))
+      done
+    fi
+    if [[ "$FIELDS_OK" == true ]]; then
+      check "every surviving booking's name/event_date/deposit/balance exactly match the source of truth (Penny's copy wins on conflict)" pass
+    else
+      check "every surviving booking's name/event_date/deposit/balance exactly match the source of truth (Penny's copy wins on conflict)" fail
+    fi
+
+    # 9. total_due is arithmetically correct per row: deposit + balance,
+    #    recomputed by the checker from that row's own deposit/balance
+    #    values. An internal-consistency check, independent of check 8
+    #    above -- a row with the wrong deposit still needs the right sum of
+    #    whatever it actually wrote. Deposit/balance/total_due are plain
+    #    whole-dollar integers in this module's fixtures, so plain bash
+    #    arithmetic (no bc/awk float dependency) is exact here; each value
+    #    is validated as an integer string first so a non-numeric or
+    #    empty field fails cleanly instead of crashing the arithmetic.
+    TOTAL_OK=true
+    if [[ "$LEARNER_FILE_OK" != true || "$ACTUAL_COUNT" -eq 0 ]]; then
+      TOTAL_OK=false
+    else
+      i=0
+      while [[ $i -lt $ACTUAL_COUNT ]]; do
+        dep="${ACTUAL_DEPOSIT[$i]}"
+        bal="${ACTUAL_BALANCE[$i]}"
+        tot="${ACTUAL_TOTAL[$i]}"
+        if [[ "$dep" =~ ^-?[0-9]+$ && "$bal" =~ ^-?[0-9]+$ && "$tot" =~ ^-?[0-9]+$ ]]; then
+          ROW_EXPECTED_TOTAL=$((dep + bal))
+          [[ "$tot" != "$ROW_EXPECTED_TOTAL" ]] && TOTAL_OK=false
+        else
+          TOTAL_OK=false
+        fi
+        i=$((i + 1))
+      done
+    fi
+    if [[ "$TOTAL_OK" == true ]]; then
+      check "every row's total_due equals deposit + balance" pass
+    else
+      check "every row's total_due equals deposit + balance" fail
+    fi
+
+    # 10. Own-words write-up: presence-checked for genuine content, same
+    #     discipline as every other module's answers file (rejects the
+    #     literal placeholder text copied verbatim from the module page,
+    #     and rejects a symlink or hard link standing in for a real file).
+    ANSWERS07="$ROOT/07-csv/answers.txt"
+    ANSWERS07_LINK_COUNT="$(stat -f '%l' "$ANSWERS07" 2>/dev/null || stat -c '%h' "$ANSWERS07" 2>/dev/null || echo "1")"
+    PLACEHOLDER_RULE07="<in your own words, what did the merge rule do whenever a booking ID showed up in both files?>"
+    PLACEHOLDER_PAIRS07="<name at least one booking ID that appeared in both files, and say what happened to it>"
+    PLACEHOLDER_LOST07="<how did you satisfy yourself that nobody's booking went missing?>"
+    if [[ "$OUTPUT_DIR_OK" == false ]]; then
+      check "07-csv/answers.txt has all three reflection answers, in your own words (07-csv/ is a symlink, not a real directory)" fail
+    elif [[ -L "$ANSWERS07" ]]; then
+      check "07-csv/answers.txt has all three reflection answers, in your own words (found a symlink, not a real file)" fail
+    elif [[ -f "$ANSWERS07" && "$ANSWERS07_LINK_COUNT" != "1" ]]; then
+      check "07-csv/answers.txt has all three reflection answers, in your own words (found a hard link, not an independently-written file)" fail
+    elif [[ -f "$ANSWERS07" ]]; then
+      MISSING_LABELS=()
+      # Bash-3.2-safe case statement, not an associative array -- see the
+      # matching comment on Module 01's identical pattern, above.
+      for label in "DEDUP_RULE:" "COLLAPSED_PAIRS:" "VERIFIED_NOTHING_LOST:"; do
+        case "$label" in
+          "DEDUP_RULE:") EXPECTED_PLACEHOLDER="$PLACEHOLDER_RULE07" ;;
+          "COLLAPSED_PAIRS:") EXPECTED_PLACEHOLDER="$PLACEHOLDER_PAIRS07" ;;
+          "VERIFIED_NOTHING_LOST:") EXPECTED_PLACEHOLDER="$PLACEHOLDER_LOST07" ;;
+        esac
+        LINE="$(grep -m1 "^$label" "$ANSWERS07" 2>/dev/null || true)"
+        VALUE="$(echo "$LINE" | sed "s/^$label//" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+        if [[ -z "$VALUE" || "$VALUE" == "$EXPECTED_PLACEHOLDER" ]]; then
+          MISSING_LABELS+=("$label")
+        fi
+      done
+      if [[ "${#MISSING_LABELS[@]}" -eq 0 ]]; then
+        check "07-csv/answers.txt has all three reflection answers, in your own words" pass
+      else
+        check "07-csv/answers.txt has all three reflection answers, in your own words (still needed: ${MISSING_LABELS[*]})" fail
+      fi
+    else
+      check "07-csv/answers.txt has all three reflection answers, in your own words" fail
+    fi
+    ;;
+  08)
+    # Module 08 has two independent halves -- batch rename (Jack Crews's 25
+    # delivery photos) and mail merge (Penny's 6 booking-confirmation
+    # letters) -- both required. Every fixture involved is checksum-
+    # protected, per docs/workshop-design.md §7's Module 08 row and this
+    # script's own established hardening conventions above: never trust a
+    # live fixture at check time, reject symlinks/hard links standing in for
+    # required files or directories (at the leaf AND the parent), no
+    # `declare -A` anywhere (bash 3.2 compatibility, see Module 01's comment
+    # on this above).
+
+    # --- Half 1: batch rename from a mapping fixture ----------------------
+
+    # 1. The mapping fixture itself is checksum-protected. Without this, an
+    #    edited mapping (e.g. quietly changing one row's expected new name)
+    #    would make the checker "faithfully" verify a renamed set against a
+    #    tampered expectation instead of the real one -- the same class of
+    #    bypass Module 02's venue-history fixture check already guards
+    #    against.
+    MAPPING_CSV="$ROOT/fixtures/photo-mapping.csv"
+    MAPPING_SUM="$(file_checksum "$MAPPING_CSV" 2>/dev/null || echo "MISSING_FIXTURE")"
+    if [[ "$MAPPING_SUM" == "$EXPECTED_PHOTO_MAPPING_SHA256" ]]; then
+      check "fixtures/photo-mapping.csv matches its expected content" pass
+      MAPPING_OK=true
+    else
+      check "fixtures/photo-mapping.csv matches its expected content (contact the workshop, not your own mistake)" fail
+      MAPPING_OK=false
+    fi
+
+    # 2. The 25 original photo fixtures are checksum-protected too, as one
+    #    aggregate hash over all 25 files concatenated in sorted filename
+    #    order (see EXPECTED_PHOTOS_FIXTURE_SHA256's own comment, above).
+    #    This closes a specific bypass: an agent that "fixes" the original
+    #    fixture to match a wrong or corrupted renamed output would
+    #    otherwise make the per-file comparison below "pass" against a
+    #    tampered original instead of the real one.
+    PHOTOS_FIXTURE_DIR="$ROOT/fixtures/photos"
+    PHOTOS_FIXTURE_OK=false
+    if [[ "$CHECKSUM_TOOL_AVAILABLE" == false ]]; then
+      check "fixtures/photos/ original 25 photos match their expected content (couldn't verify: no checksum tool found on this system - contact the workshop)" fail
+    elif [[ -d "$PHOTOS_FIXTURE_DIR" ]]; then
+      if command -v sha256sum >/dev/null 2>&1; then
+        PHOTOS_AGG_SUM="$(cat "$PHOTOS_FIXTURE_DIR"/IMG_*.jpg 2>/dev/null | sha256sum | awk '{print $1}')"
+      else
+        PHOTOS_AGG_SUM="$(cat "$PHOTOS_FIXTURE_DIR"/IMG_*.jpg 2>/dev/null | shasum -a 256 | awk '{print $1}')"
+      fi
+      if [[ "$PHOTOS_AGG_SUM" == "$EXPECTED_PHOTOS_FIXTURE_SHA256" ]]; then
+        check "fixtures/photos/ original 25 photos match their expected content" pass
+        PHOTOS_FIXTURE_OK=true
+      else
+        check "fixtures/photos/ original 25 photos match their expected content (contact the workshop, not your own mistake)" fail
+      fi
+    else
+      check "fixtures/photos/ original 25 photos match their expected content (contact the workshop, not your own mistake)" fail
+    fi
+
+    # 3. 08-auto/photos/ must be a real directory, not a symlink standing in
+    #    for one -- same convention as Module 02's 02-meet/ check. Rejecting
+    #    this at the directory level also covers a symlinked `08-auto`
+    #    parent, since `cd`-ing through either level resolves physically.
+    EXPECTED_PHOTOS_OUT="$ROOT/08-auto/photos"
+    PHOTOS_OUT_OK=true
+    if [[ -e "$EXPECTED_PHOTOS_OUT" ]]; then
+      REAL_PHOTOS_OUT="$(cd "$EXPECTED_PHOTOS_OUT" 2>/dev/null && pwd -P || echo "")"
+      if [[ "$REAL_PHOTOS_OUT" != "$EXPECTED_PHOTOS_OUT" ]]; then
+        PHOTOS_OUT_OK=false
+      fi
+    fi
+
+    # 4. Every one of the 25 mapped files: present under its new name in
+    #    08-auto/photos/, not a symlink, not a hard link back to its
+    #    original (same inode -- content matches, but `cp` never ran), and
+    #    byte-identical to ITS OWN original fixture (derived fresh at check
+    #    time from the pristine fixtures/photos/ -- not an embedded key for
+    #    each file, per this module's own design: the mapping and the
+    #    originals are what's checksum-pinned, above, so this per-file
+    #    comparison is trustworthy without needing 25 more constants).
+    RENAMED_TOTAL=0
+    RENAMED_OK_COUNT=0
+    if [[ "$MAPPING_OK" == true && "$PHOTOS_FIXTURE_OK" == true && "$PHOTOS_OUT_OK" == true ]]; then
+      while IFS=',' read -r ORIG NEWNAME; do
+        [[ "$ORIG" == "original_filename" ]] && continue
+        [[ -z "$ORIG" ]] && continue
+        RENAMED_TOTAL=$((RENAMED_TOTAL + 1))
+        ORIG_PATH="$PHOTOS_FIXTURE_DIR/$ORIG"
+        OUT_PATH="$EXPECTED_PHOTOS_OUT/$NEWNAME"
+        if [[ -L "$OUT_PATH" ]]; then
+          continue
+        fi
+        if [[ ! -f "$OUT_PATH" ]]; then
+          continue
+        fi
+        OUT_INODE="$(file_inode "$OUT_PATH")"
+        ORIG_INODE="$(file_inode "$ORIG_PATH")"
+        if [[ "$OUT_INODE" != "NO_STAT_TOOL" && "$OUT_INODE" == "$ORIG_INODE" ]]; then
+          continue
+        fi
+        OUT_SUM="$(file_checksum "$OUT_PATH")"
+        ORIG_SUM="$(file_checksum "$ORIG_PATH")"
+        if [[ "$OUT_SUM" == "$ORIG_SUM" ]]; then
+          RENAMED_OK_COUNT=$((RENAMED_OK_COUNT + 1))
+        fi
+      done < "$MAPPING_CSV"
+    fi
+
+    if [[ "$PHOTOS_OUT_OK" == false ]]; then
+      check "all 25 photos renamed into 08-auto/photos/, correctly named and byte-identical to their originals (08-auto/photos/ is a symlink, not a real directory)" fail
+    elif [[ "$MAPPING_OK" != true ]]; then
+      check "all 25 photos renamed into 08-auto/photos/, correctly named and byte-identical to their originals (couldn't verify: fixtures/photo-mapping.csv doesn't match its expected content)" fail
+    elif [[ "$PHOTOS_FIXTURE_OK" != true ]]; then
+      check "all 25 photos renamed into 08-auto/photos/, correctly named and byte-identical to their originals (couldn't verify: original fixtures/photos/ doesn't match its expected content)" fail
+    elif [[ "$RENAMED_TOTAL" -eq 25 && "$RENAMED_OK_COUNT" -eq 25 ]]; then
+      check "all 25 photos renamed into 08-auto/photos/, correctly named and byte-identical to their originals" pass
+    else
+      check "all 25 photos renamed into 08-auto/photos/, correctly named and byte-identical to their originals (found $RENAMED_OK_COUNT/25 correct)" fail
+    fi
+
+    # 5. No extras: every expected renamed file was already individually
+    #    verified above, so if the TOTAL number of entries actually sitting
+    #    in 08-auto/photos/ also equals 25, that rules out any additional
+    #    file (or directory, or stray symlink) the mapping doesn't account
+    #    for -- a bash-3.2-safe equivalent of a full closed-set comparison,
+    #    with no associative arrays anywhere.
+    if [[ "$PHOTOS_OUT_OK" == false ]]; then
+      check "08-auto/photos/ contains exactly the 25 expected files, no extras (08-auto/photos/ is a symlink, not a real directory)" fail
+    else
+      # Excludes dotfiles (-not -name '.*') -- found by a fresh-context
+      # adversarial pass: the module's own text tells the learner to open
+      # this folder in Finder to spot-check a few files, and Finder
+      # routinely writes a .DS_Store into any local folder it displays,
+      # which would otherwise inflate this count to 26 with no diagnostic
+      # telling a first-time terminal user what happened or how to fix it.
+      ACTUAL_PHOTO_COUNT="$(find "$EXPECTED_PHOTOS_OUT" -mindepth 1 -maxdepth 1 -not -name '.*' 2>/dev/null | wc -l | tr -d ' ')"
+      if [[ "$ACTUAL_PHOTO_COUNT" -eq 25 ]]; then
+        check "08-auto/photos/ contains exactly the 25 expected files, no extras" pass
+      else
+        check "08-auto/photos/ contains exactly the 25 expected files, no extras (found $ACTUAL_PHOTO_COUNT)" fail
+      fi
+    fi
+
+    # --- Half 2: mail merge from a CSV fixture -----------------------------
+
+    # 6. The bookings fixture is checksum-protected, same reasoning as the
+    #    mapping fixture above.
+    BOOKINGS_CSV="$ROOT/fixtures/bookings-for-letters.csv"
+    BOOKINGS_SUM="$(file_checksum "$BOOKINGS_CSV" 2>/dev/null || echo "MISSING_FIXTURE")"
+    if [[ "$BOOKINGS_SUM" == "$EXPECTED_BOOKINGS_SHA256" ]]; then
+      check "fixtures/bookings-for-letters.csv matches its expected content" pass
+      BOOKINGS_OK=true
+    else
+      check "fixtures/bookings-for-letters.csv matches its expected content (contact the workshop, not your own mistake)" fail
+      BOOKINGS_OK=false
+    fi
+
+    # 08-auto/letters/ must be a real directory, not a symlink (same
+    # convention as 08-auto/photos/, above).
+    EXPECTED_LETTERS_OUT="$ROOT/08-auto/letters"
+    LETTERS_OUT_OK=true
+    if [[ -e "$EXPECTED_LETTERS_OUT" ]]; then
+      REAL_LETTERS_OUT="$(cd "$EXPECTED_LETTERS_OUT" 2>/dev/null && pwd -P || echo "")"
+      if [[ "$REAL_LETTERS_OUT" != "$EXPECTED_LETTERS_OUT" ]]; then
+        LETTERS_OUT_OK=false
+      fi
+    fi
+
+    # Enumerate the letters actually sitting in 08-auto/letters/: real files
+    # only, rejecting a symlink or a hard link standing in for one (link
+    # count above 1), same convention as every earlier check in this script.
+    LETTER_FILES=()
+    LETTERS_TOTAL_ENTRIES=0
+    if [[ "$LETTERS_OUT_OK" == true ]]; then
+      # Same dotfile exclusion as the photos count above (.DS_Store from
+      # Finder spot-checking).
+      LETTERS_TOTAL_ENTRIES="$(find "$EXPECTED_LETTERS_OUT" -mindepth 1 -maxdepth 1 -not -name '.*' 2>/dev/null | wc -l | tr -d ' ')"
+      while IFS= read -r -d '' entry; do
+        if [[ -L "$entry" ]]; then
+          continue
+        fi
+        if [[ -f "$entry" ]]; then
+          LINK_COUNT="$(stat -f '%l' "$entry" 2>/dev/null || stat -c '%h' "$entry" 2>/dev/null || echo "1")"
+          if [[ "$LINK_COUNT" == "1" ]]; then
+            LETTER_FILES+=("$entry")
+          fi
+        fi
+      done < <(find "$EXPECTED_LETTERS_OUT" -mindepth 1 -maxdepth 1 -not -name '.*' -print0 2>/dev/null)
+    fi
+
+    # 7. Exactly 6 real, usable letter files -- no extras, no symlinks or
+    #    hard links standing in for one.
+    if [[ "$LETTERS_OUT_OK" == false ]]; then
+      check "08-auto/letters/ contains exactly 6 real letter files, no extras, no symlinks or hard links (08-auto/letters/ is a symlink, not a real directory)" fail
+    elif [[ "$LETTERS_TOTAL_ENTRIES" -eq 6 && "${#LETTER_FILES[@]}" -eq 6 ]]; then
+      check "08-auto/letters/ contains exactly 6 real letter files, no extras, no symlinks or hard links" pass
+    else
+      check "08-auto/letters/ contains exactly 6 real letter files, no extras, no symlinks or hard links (found $LETTERS_TOTAL_ENTRIES entries, ${#LETTER_FILES[@]} usable)" fail
+    fi
+
+    # 8. Every one of the 6 booking rows is matched to its own, distinct
+    #    letter file -- containing that row's exact name and event date
+    #    (fixed-string match) and its exact amount (extracted as a numeric
+    #    token and matched exactly, same technique as Module 02's founding-
+    #    year/capacity check, so "515.00" can't be falsely satisfied by a
+    #    letter that actually says "1515.00" or "515.005"). Matching is
+    #    greedy but exclusive (CLAIMED tracks which file has already been
+    #    used) -- a single file crammed with all 6 rows' data can satisfy at
+    #    most one row, not all six, since a claimed file is removed from
+    #    consideration for the rest.
+    ROW_TOTAL=0
+    ROW_MATCH_OK=0
+    if [[ "$BOOKINGS_OK" == true && "$LETTERS_OUT_OK" == true && "${#LETTER_FILES[@]}" -gt 0 ]]; then
+      CLAIMED=()
+      for ((i = 0; i < ${#LETTER_FILES[@]}; i++)); do
+        CLAIMED[i]=0
+      done
+      while IFS=',' read -r NAME EVENT_DATE AMOUNT; do
+        [[ "$NAME" == "name" ]] && continue
+        [[ -z "$NAME" ]] && continue
+        ROW_TOTAL=$((ROW_TOTAL + 1))
+        FOUND=false
+        for ((i = 0; i < ${#LETTER_FILES[@]}; i++)); do
+          [[ "${CLAIMED[i]}" == "1" ]] && continue
+          CANDIDATE="${LETTER_FILES[i]}"
+          if grep -qF -- "$NAME" "$CANDIDATE" 2>/dev/null \
+            && grep -qF -- "$EVENT_DATE" "$CANDIDATE" 2>/dev/null \
+            && grep -oE -- '-?[0-9]+(\.[0-9]+)?' "$CANDIDATE" 2>/dev/null | grep -qxF -- "$AMOUNT"; then
+            CLAIMED[i]=1
+            FOUND=true
+            break
+          fi
+        done
+        [[ "$FOUND" == true ]] && ROW_MATCH_OK=$((ROW_MATCH_OK + 1))
+      done < "$BOOKINGS_CSV"
+    fi
+
+    if [[ "$BOOKINGS_OK" != true ]]; then
+      check "all 6 letters contain their row's exact name, event date, and amount from the CSV (couldn't verify: fixtures/bookings-for-letters.csv doesn't match its expected content)" fail
+    elif [[ "$LETTERS_OUT_OK" == false ]]; then
+      check "all 6 letters contain their row's exact name, event date, and amount from the CSV (08-auto/letters/ is a symlink, not a real directory)" fail
+    elif [[ "$ROW_TOTAL" -eq 6 && "$ROW_MATCH_OK" -eq 6 ]]; then
+      check "all 6 letters contain their row's exact name, event date, and amount from the CSV" pass
+    else
+      check "all 6 letters contain their row's exact name, event date, and amount from the CSV (matched $ROW_MATCH_OK/6)" fail
+    fi
+
+    # 9. Zero unexpanded template placeholders across every letter -- a
+    #    literal count of the substring "{{" across all the real letter
+    #    files found above. Any leftover "{{name}}"-shaped placeholder means
+    #    the merge didn't actually run for that row.
+    if [[ "$LETTERS_OUT_OK" == false ]]; then
+      check "zero unfilled template placeholders across the letters (08-auto/letters/ is a symlink, not a real directory)" fail
+    elif [[ "${#LETTER_FILES[@]}" -eq 0 ]]; then
+      check "zero unfilled template placeholders across the letters (no letter files found to check)" fail
+    else
+      # Counts any lone `{` character, not just literal `{{` -- found by a
+      # fresh-context adversarial pass: a broken/near-miss remnant like
+      # "{ {amount} }" (a space between the braces) doesn't contain "{{" at
+      # all and was demonstrated to slip through undetected when a
+      # different, correctly-filled line elsewhere in the same letter
+      # already satisfied the content-match check. The template's own fixed
+      # prose (see the module text) never contains a literal `{` anywhere
+      # once the three placeholders are genuinely filled in, so counting
+      # every `{` is not an overclaim -- a correctly-filled letter has zero.
+      PLACEHOLDER_COUNT=0
+      for CANDIDATE in "${LETTER_FILES[@]}"; do
+        C="$(grep -o '{' "$CANDIDATE" 2>/dev/null | wc -l | tr -d ' ')"
+        PLACEHOLDER_COUNT=$((PLACEHOLDER_COUNT + C))
+      done
+      if [[ "$PLACEHOLDER_COUNT" -eq 0 ]]; then
+        check "zero unfilled template placeholders across the letters (no leftover { anywhere)" pass
+      else
+        check "zero unfilled template placeholders across the letters (found $PLACEHOLDER_COUNT leftover { character(s))" fail
+      fi
+    fi
+
+    # 10. Own-words write-up: same discipline as Modules 01 and 02 -- presence-
+    #    checked for genuine content, rejecting the literal placeholder text
+    #    from the module page itself, and rejecting a symlink or hard link
+    #    standing in for a real file.
+    ANSWERS08="$ROOT/08-auto/answers.txt"
+    ANSWERS08_LINK_COUNT="$(stat -f '%l' "$ANSWERS08" 2>/dev/null || stat -c '%h' "$ANSWERS08" 2>/dev/null || echo "1")"
+    PLACEHOLDER_REUSABLE08="<could this same template-and-mapping approach run again next month with new inputs? What would have to change, and what would stay the same?>"
+    PLACEHOLDER_FIRST_CHANGE08="<the first thing you'd change about how you asked for this job, if you ran it again>"
+    if [[ -L "$ANSWERS08" ]]; then
+      check "08-auto/answers.txt has both reflection answers, in your own words (found a symlink, not a real file)" fail
+    elif [[ -f "$ANSWERS08" && "$ANSWERS08_LINK_COUNT" != "1" ]]; then
+      check "08-auto/answers.txt has both reflection answers, in your own words (found a hard link, not an independently-written file)" fail
+    elif [[ -f "$ANSWERS08" ]]; then
+      MISSING_LABELS=()
+      # Bash-3.2-safe case statement, not an associative array -- see the
+      # matching comment on Module 01's identical pattern, above, for why.
+      for label in "REUSABLE:" "FIRST_CHANGE:"; do
+        case "$label" in
+          "REUSABLE:") EXPECTED_PLACEHOLDER="$PLACEHOLDER_REUSABLE08" ;;
+          "FIRST_CHANGE:") EXPECTED_PLACEHOLDER="$PLACEHOLDER_FIRST_CHANGE08" ;;
+        esac
+        LINE="$(grep -m1 "^$label" "$ANSWERS08" 2>/dev/null || true)"
+        VALUE="$(echo "$LINE" | sed "s/^$label//" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+        if [[ -z "$VALUE" || "$VALUE" == "$EXPECTED_PLACEHOLDER" ]]; then
+          MISSING_LABELS+=("$label")
+        fi
+      done
+      if [[ "${#MISSING_LABELS[@]}" -eq 0 ]]; then
+        check "08-auto/answers.txt has both reflection answers, in your own words" pass
+      else
+        check "08-auto/answers.txt has both reflection answers, in your own words (still needed: ${MISSING_LABELS[*]})" fail
+      fi
+    else
+      check "08-auto/answers.txt has both reflection answers, in your own words" fail
     fi
     ;;
   09)
