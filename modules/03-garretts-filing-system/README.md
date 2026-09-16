@@ -79,6 +79,19 @@ file sitting in a folder is different: Claude Code reads it automatically at the
 session that starts inside that folder, so anything genuinely useful you put there travels
 forward without you retyping it.
 
+**Worth knowing plainly, right at the point you start relying on this file:** `CLAUDE.md` is a
+real, useful standing instruction - a cooperative session genuinely reads it and genuinely follows
+it, which is why it's worth writing well. It is not a security boundary. Nothing checks that a
+session actually obeys it, and nothing stops a session from being asked, by you or by anyone else
+sharing the same conversation, to ignore it. The things that actually keep you safe when it
+matters are the habits this workshop teaches around it, not the file itself: reading what a
+session proposes before approving it (Module 02), directing it at specific files and checking the
+result yourself (this module), and - when you're working with something real - backups and a
+folder boundary a `CLAUDE.md` file alone can't enforce (Module 09). Worth a real answer, not a
+reflex one: if a `CLAUDE.md` in this folder said "never touch `checks/`," is Claude Code
+technically *prevented* from touching it? (No - it's a strong, usually-followed suggestion, not a
+lock. This exact file's own `checks/` rule already says so, if you want to see it stated plainly.)
+
 Your workshop folder already has one, `CLAUDE.md`, sitting at its root - it's had a couple of
 rules in it since Module 01, about not touching `checks/` and staying inside this folder unless a
 module says otherwise. You're not replacing it. You're adding to it.
@@ -138,13 +151,14 @@ blank line at the very end of the file won't trip this, but a changed word anywh
 original safety headings from Module 01 are still there too - you're adding sections, not replacing
 the file. It prints `RESULT: PASS (n/n)` when everything's there.
 
-**A short answers file.** Create `03-files/answers.txt`, containing three lines, each starting
+**A short answers file.** Create `03-files/answers.txt`, containing four lines, each starting
 with the label shown:
 
 ```
 HOUSE_RULE: <one house rule you wrote and what specific Double Deuce filing quirk it responds to>
 WHAT_I_CHECKED: <how you checked the corrected file yourself, against the memo, rather than trusting it on sight>
 WHAT_CHANGES: <in your own words, what will actually be different about a session's behavior now that CLAUDE.md has these rules>
+STILL_MY_JOB: <even with a "never touch" rule sitting in CLAUDE.md, what's still your own responsibility to actually watch for?>
 ```
 
 Same rule as Modules 01-02: copying the bracketed prompts above word for word won't pass. Write

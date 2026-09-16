@@ -134,15 +134,45 @@ file per row, in `10-capstone/vip-letters/`, each one naming that guest, the dat
 size somewhere in the text. Same rule as Module 08: check for leftover template placeholders
 before you call it done. None should remain.
 
-## Before you finish: re-read Module 09
+## Before you finish: rehearse Module 09's ritual
 
 Nothing in this capstone leaves your workshop folder - everything above stays sandboxed, same as
 every module before Module 09. But the job itself, the kind Tilghman just handed you, is exactly
 the kind of job that *could* show up on your own real files someday: vendor research, a budget
-write-up, a guest list, a folder of photos. Before you move on, go back and reread Module 09's
-five-step ritual - copy in, back up, manifest, preview, verify - and its two hard lines. You don't
-need to run it again here. Just make sure it's the thing you'd actually reach for, not something
-you skimmed once and filed away.
+write-up, a guest list, a folder of photos. Before you move on, rehearse Module 09's ritual against
+a new scenario - not the six situations you already answered there, a fresh one, so the point is
+whether you can actually apply it, not whether you remember which numbers you picked last time.
+
+Opening night itself, mid-show, Tilghman hands you his own phone: "My photos app has tonight's
+crowd shots. Have Claude Code pull the best ones into a folder for the recap email, and just
+delete the blurry ones off my phone so I've got room for more."
+
+Six things Claude Code could do next. Read each one against Module 09's own five-step ritual and
+its two hard lines, not against what feels reasonable in the moment:
+
+1. Copy the photos you want into a brand-new folder next to (not inside) wherever the originals
+   live, verify the copies against the originals, and leave his phone's own photo library
+   completely untouched.
+2. Delete the blurry photos directly off his phone right away, since that's literally what he
+   asked for and there's a show going on.
+3. Before touching anything, ask Tilghman where he'd want a backup of his phone's photo library
+   kept, and wait for a real answer before doing anything else.
+4. Skip the backup this one time, since it's "just photos" and the copies going to the recap
+   folder are backup enough if anything goes wrong.
+5. Copy the wanted photos out first, confirm the copies are good, and only then delete the blurry
+   originals off the phone - after the copies are already safely somewhere else.
+6. Point Claude Code at his entire phone's storage "just in case it needs anything else," so you
+   don't have to go back and ask again mid-show.
+
+Create `10-capstone/ritual-rehearsal.txt`:
+
+```
+SAFE_ACTIONS: <the numbers of every action above that actually follows Module 09's ritual and hard lines - comma-separated>
+WHY_RISKY: <name one action you did NOT pick, and say in your own words what specifically about it breaks the ritual>
+```
+
+(Those are example numbers, not the answer. Work it out from Module 09's own ritual and hard
+lines, applied fresh to this scenario.)
 
 ## Building your pack
 
@@ -176,21 +206,27 @@ earlier module's), each one using the same mechanism its source module taught - 
 distinct-source citation counting for the research brief, a script-computed total and extremes for
 the crew report, exact-figure matching for the budget write-up, a recomputed merge with the correct
 conflict winner for the guest list, and byte-for-byte renamed photos plus placeholder-free letters
-for the last part - and then the pack itself: the three named files, at least five more real
-entries, and your workshop folder's `CLAUDE.md` still carrying the headers Module 03 asked you to
-preserve. It prints `RESULT: PASS` with every item checked when everything's there. As always, the
-message next to anything still failing says exactly what's missing.
+for the last part; the ritual rehearsal above, matched against the one correct set of safe actions
+for that specific scenario; and then the pack itself: the three named files, at least five more
+real entries, and your workshop folder's `CLAUDE.md` still carrying the headers Module 03 asked you
+to preserve. It prints `RESULT: PASS` with every item checked when everything's there. As always,
+the message next to anything still failing says exactly what's missing.
 
 **A short write-up.** `10-capstone/answers.txt`, from the pack-building step above - a genuine
 reflection on what you actually used today, in your own words. Same rule as every prior module's
 answers file: this isn't graded on a particular answer, and it isn't something Claude Code can
 fill in for you convincingly. It's the one part of this module that's about you, not the files.
 
-One honest limit, same shape as every earlier module's: this checklist can confirm the right files
-exist with the right shape and the right numbers. It can't confirm Claude Code did the research,
-the drafting, or the renaming rather than you doing it by hand and pasting the result in - the same
-provenance limit every module before this one already carries. What it can confirm, completely,
-is whether the work is actually correct against this module's own new facts.
+Two honest limits, same shape as every earlier module's. First: this checklist can confirm the
+right files exist with the right shape and the right numbers. It can't confirm Claude Code did the
+research, the drafting, or the renaming rather than you doing it by hand and pasting the result in
+- the same provenance limit every module before this one already carries. What it can confirm,
+completely, is whether the work is actually correct against this module's own new facts. Second,
+specific to the ritual rehearsal: picking the right set of safe actions out of six isn't hard to
+brute-force by trying different combinations against a checklist that tells you pass or fail -
+nothing stops that. `WHY_RISKY` asks for your own reasoning precisely because a set of numbers
+alone doesn't prove you understood why; it can't grade whether your reasoning is actually correct,
+but a genuine answer there is worth writing for your own sake, not just the checklist's.
 
 ## Takeaway
 

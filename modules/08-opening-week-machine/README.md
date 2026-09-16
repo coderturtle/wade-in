@@ -140,12 +140,13 @@ understand why the pattern generalizes, not just whether it worked once.
 
 ## Takeaway
 
-Two reusable mini-recipes added to `my-pack/`: **batch-rename-from-mapping** (point Claude Code at
-a folder of files and a mapping sheet, ask it to copy-and-rename the whole set, verify a sample by
-hand) and **mail-merge-from-CSV** (point it at a CSV and a template with placeholders, ask it to
-produce one filled file per row, verify no placeholder survives). Both are the same underlying
-move - one row or one mapping entry becomes one output file - and both are worth reaching for any
-time a job says "do this same thing 25 times."
+Two reusable recipes, added to `my-pack/` under these exact names - the capstone checks for both by
+name, not a title of your own choosing: `recipe-batch-rename.md` (point Claude Code at a folder of
+files and a mapping sheet, ask it to copy-and-rename the whole set, verify a sample by hand) and
+`recipe-mail-merge.md` (point it at a CSV and a template with placeholders, ask it to produce one
+filled file per row, verify no placeholder survives). Both are the same underlying move - one row
+or one mapping entry becomes one output file - and both are worth reaching for any time a job says
+"do this same thing 25 times."
 
 ---
 

@@ -121,9 +121,10 @@ word won't pass. Write your own answer, grounded in what you actually did in Par
 
 ## Takeaway
 
-A CSV-task recipe, added to `my-pack/`: state the rule before you ask, demand a before/after count,
+Add `my-pack/recipe-csv-task.md`: state the rule before you ask, demand a before/after count,
 verify at least one sample row by hand against the real source file. This recipe generalizes past
-today's bookings - it's the shape of any "combine two spreadsheets under a rule" task.
+today's bookings - it's the shape of any "combine two spreadsheets under a rule" task. The capstone
+checks for this file by its exact name, so use it as shown, not a name of your own choosing.
 
 ---
 

@@ -132,11 +132,12 @@ pass. Write your own answer, even a short one.
 
 ## Takeaway
 
-Add a new recipe to `my-pack/`: a document-drafting prompt template built from what worked today -
-name the source file, name the exact output path, spell out the required structure (section
-headers, in order), and state the exact-figures constraint plainly, the same way Part 2's request
-did. This is the shape of request that turns "draft me a summary" from a guess into something with
-a checkable right answer.
+Add `my-pack/recipe-document-drafting.md`: a document-drafting prompt template built from what
+worked today - name the source file, name the exact output path, spell out the required structure
+(section headers, in order), and state the exact-figures constraint plainly, the same way Part 2's
+request did. This is the shape of request that turns "draft me a summary" from a guess into
+something with a checkable right answer. The capstone checks for this file by its exact name, so
+use it as shown, not a name of your own choosing.
 
 ---
 

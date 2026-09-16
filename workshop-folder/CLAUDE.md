@@ -13,7 +13,7 @@ opening the script for them.
 
 ## Stay inside this folder unless a module says otherwise
 
-Everything through Module 09 is designed to be done inside this workshop folder, not
+Everything through Module 08 is designed to be done inside this workshop folder, not
 the learner's real files elsewhere on their computer. If a task seems to call for
 touching something outside this folder, that's worth flagging to the learner rather
 than just doing it. Module 09 is where working with real files becomes an explicit,

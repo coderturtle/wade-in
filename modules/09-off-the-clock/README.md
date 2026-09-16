@@ -17,10 +17,12 @@ safe: copy in, back up, manifest, preview, verify.
 
 ## Before you start
 
-You'll need Modules 03 and 04 finished. Module 03 is where you learned to direct Claude Code to
-change a real file and to write its house rules for how the office works; Module 04 is where you learned to direct it
-through a plan-preview-run-verify cycle without reading the code yourself. Both habits matter
-today, aimed somewhere new. Budget about 45-60 minutes, maybe a little more the first time through.
+You'll need Modules 03 and 04 finished - Module 03 is where you learned to direct Claude Code to
+change a real file and where you first met the idea that a `CLAUDE.md` file is a real, useful
+standing instruction but not a real lock (more on exactly what that means for today, below); Module
+04 is where you learned to direct it through a plan-preview-run-verify cycle without reading the
+code yourself. Both habits matter today, aimed somewhere new. Budget about 45-60 minutes, maybe a
+little more the first time through.
 
 **One thing worth saying plainly before you start:** everything in this module happens on your own
 machine, using either a couple of your own real files or the stand-ins this workshop provides. At
@@ -77,6 +79,13 @@ something unrelated you don't recognize, stop and figure out what it is before t
 copy your exercise files into a folder you didn't set up yourself, and don't delete something you
 don't understand.
 
+**If you're redoing this module** because you attempted it before today: this module's ritual
+changed since your last attempt (the backup now lives in its own separate folder, not inside your
+working folder - see Part 3). Clear out both `~/wade-in-real-folder` and, if it exists,
+`~/wade-in-real-folder/backup`, then `mkdir ~/wade-in-real-folder` fresh and continue below. Your
+old `09-real-work/` files in the workshop folder get overwritten automatically as you redo each
+part; nothing needs to be deleted there by hand.
+
 Now copy your chosen files in, one at a time, by exact name. (Typing each `cp` out individually,
 rather than using a wildcard like `*.*`, is worth the extra typing here. A wildcard copies
 whatever happens to match the pattern, which is a worse habit to build for a folder that might
@@ -104,24 +113,36 @@ ls ~/wade-in-real-folder
 
 Confirm you see exactly the files you meant to copy in, nothing more.
 
-## Part 3: back up
+## Part 3: back up - outside the folder Claude Code will ever see
 
 Before Claude Code goes anywhere near this folder, make a real backup, by hand, while you know
-exactly what's in it:
+exactly what's in it. This time, the backup goes in its own separate folder, a sibling of your real
+folder, not inside it:
 
 ```
-mkdir ~/wade-in-real-folder/backup
+mkdir ~/wade-in-real-backup
 ```
 
-Then copy each file in by exact name again, same discipline as Part 2:
+Then copy each file in by exact name, same discipline as Part 2:
 
 ```
-cp ~/wade-in-real-folder/note-to-self.txt ~/wade-in-real-folder/backup/
+cp ~/wade-in-real-folder/note-to-self.txt ~/wade-in-real-backup/
 ```
 
 (Repeat for each file.) This is your undo story for today: if anything goes wrong later, the
-answer is "copy it back out of `backup/`," not "hope Claude Code can undo it" or "hope you
-remember what it used to say."
+answer is "copy it back out of `~/wade-in-real-backup`," not "hope Claude Code can undo it" or
+"hope you remember what it used to say."
+
+**Why a separate folder, not `backup/` inside your real folder:** a backup sitting inside the same
+folder you're about to point Claude Code at is a backup the session can see and, if asked (by you,
+by mistake, or by a prompt-injected instruction hiding in a file it reads), potentially touch. Two
+separate folders means the only way a session ever reaches your backup is if you yourself launch it
+from there or explicitly grant it that path - not something that can happen by drifting inside a
+single conversation. This is a real, structural improvement over one folder holding both, worth
+knowing plainly: it's a *boundary*, not an absolute lock. Nothing stops you, the human, from later
+pointing a session at `~/wade-in-real-backup` yourself, on purpose or by a careless copy-paste. The
+protection here is that it can no longer happen *by accident*, mid-session, without you deliberately
+choosing to grant that access.
 
 ## Part 4: manifest
 
@@ -146,7 +167,9 @@ That's expected and normal at this point, same as every other module's checklist
 What matters here: this run is what records, for real, that your before-manifest existed at this
 point in time, before anything below happens. You can't back-date that later by editing the file's
 timestamp; the checklist never trusts a file's timestamp, only its own clock, the first time it
-sees this exact manifest.
+sees this exact manifest. It also quietly records each file's own fingerprint at this exact moment
+- that's what Part 6's integrity check compares against later, so this step is worth doing honestly,
+in order, not after the fact.
 
 ## Part 5: preview
 
@@ -156,14 +179,20 @@ far) telling it to stay inside this folder. Something like:
 
 ```
 Stay inside this folder. Don't read, write, or touch anything outside
-~/wade-in-real-folder, including backup/ unless I specifically ask about it.
+~/wade-in-real-folder.
 ```
 
-This is the same technique Module 03 taught for the workshop folder, pointed at your new real one.
-It's an instruction, not a lock (nothing stops a session from being asked to ignore it), and it
-only takes effect from the start of a session, not partway through, which is why it's worth
-creating before you launch Claude Code here rather than after. Still a real, cheap habit worth
-keeping every time you open Claude Code somewhere new.
+This is the same technique Module 03 taught for the workshop folder, pointed at your new real one -
+and the same real limit applies here that Module 03 already named: it's a standing instruction a
+cooperative session follows, not an enforcement mechanism. It only takes effect from the start of a
+session, not partway through, which is why it's worth creating before you launch Claude Code here
+rather than after. Still a real, cheap habit worth keeping every time you open Claude Code
+somewhere new - your actual protection today is the ritual itself (the separate backup, the
+manifests, the verify step below), not this file.
+
+One thing worth knowing before you run your after-manifest: this optional `CLAUDE.md` will show up
+as a second new file alongside `index.txt` once you do. That's fine - the checklist below looks for
+`index.txt` specifically, by name, so `CLAUDE.md` sitting there too doesn't affect anything.
 
 Now, and only now, point Claude Code at the real folder itself:
 
@@ -173,12 +202,12 @@ claude --permission-mode default
 ```
 
 Ask for something small and strictly additive, nothing that renames, moves, or deletes anything.
-Something like this works as a starting point:
+This module's checklist looks for exactly this artifact, so ask for it by name:
 
 ```
-Read the files directly in this folder (not backup/) and write a short, one-line description of
-each one into a new file called index.txt in this same folder. Don't rename, move, or change any
-of the files you read, and don't touch anything in backup/.
+Read the files directly in this folder and write a short, one-line description of each one into a
+new file called index.txt in this same folder. Don't rename, move, or change any of the files you
+read, and don't touch or ask about anything outside this folder.
 ```
 
 Because you launched with `--permission-mode default`, Claude Code will stop and show you exactly
@@ -191,7 +220,7 @@ When it's done, exit with `Ctrl+D` twice, and `cd` back to your workshop folder.
 
 ## Part 6: verify
 
-Check your real folder now has the new file, and nothing else changed:
+Check your real folder now has the new file, and nothing else changed *by name*:
 
 ```
 ls ~/wade-in-real-folder
@@ -209,11 +238,23 @@ Run the checklist again:
 bash checks/check.sh 09
 ```
 
-This is where the whole ritual gets checked for real: your backup matches what was actually there
-before you started (not just in name, but byte for byte); your before-manifest really was recorded
-before your after-manifest, not just placed in that order; and (below) the safety exercise and your
-own safety plan. If anything still shows `FAIL`, the message next to it says exactly what's still
-missing.
+**This is the step worth understanding, not just running.** A file keeping its name doesn't mean
+its *contents* didn't change - `ls` alone can't tell the difference between an untouched file and
+one that was silently rewritten while keeping the same name. That's why the checklist now also
+re-checks each original file's fingerprint against the one it recorded back in Part 4: if `index.txt`
+is genuinely the only thing that changed, you'll see a clear pass on that check; if anything else
+was touched, even without being renamed, that's what actually catches it. This check is scoped to
+today's task specifically - Part 5 asked for something "strictly additive," so today the rule is
+your original files stay byte-for-byte exactly as they were. That's not a universal rule for every
+real-file task you'll ever do (a later, more complex job might genuinely need to edit or reorganize
+real files, previewed and backed up first, the same way Module 04 taught) - it's the rule for what
+this exercise specifically asked for.
+
+This is also where the whole ritual gets checked for real: your backup (in its own separate folder)
+matches what was actually there before you started, byte for byte; your before-manifest really was
+recorded before your after-manifest, not just placed in that order; and (below) the safety exercise
+and your own safety plan. If anything still shows `FAIL`, the message next to it names the file and
+what's expected of it - never the file's actual contents.
 
 ## The safety exercise
 
@@ -224,9 +265,10 @@ actually apply them to a new situation, not just recognize the words:
    this.** Never at a path outside it, even to grab one more file, even "just to take a quick
    look." You decide what goes into that folder, by hand, before a session starts. A session
    reaching out to grab more on its own is exactly what this rule exists to catch.
-2. **Never let Claude Code touch, move, or empty `backup/`.** Backup is your undo story. The
-   moment it becomes part of the task instead of your safety net, you've lost the one thing that
-   was supposed to protect you if something went wrong.
+2. **Never grant a session access to your backup folder, even if it asks, even to "double-check"
+   something.** Your backup lives in its own separate folder specifically so a session never has a
+   reason to see it. The moment you grant that access, even once, even for something that sounds
+   harmless, you've undone the one structural protection this ritual is built around.
 
 Six situations. Exactly three are safe under the two rules above. Read all six before you answer;
 a couple of them only make sense once you actually apply the rule, not just skim for a scary word.
@@ -238,13 +280,14 @@ a couple of them only make sense once you actually apply the rule, not just skim
 3. You ask Claude Code to grab a copy of an old file from your Documents folder and add it to your
    real folder, since it might be useful for the task.
 4. Claude Code proposes a plan to sort the files in your real folder into two subfolders by type,
-   shows you exactly which files would move where, and you approve it after checking the plan
-   doesn't touch anything in `backup/`.
-5. Claude Code finishes the task and mentions that `backup/` is just taking up space now that
-   everything looks done, and offers to empty it out. You say yes, since the task looks finished.
-6. Before asking Claude Code to rename anything in your real folder, you check that `backup/`
-   already contains a copy of every file, then ask it to show you its plan before it renames
-   anything, and you read the plan carefully before approving.
+   all still inside that same real folder, shows you exactly which files would move where, and you
+   approve it after confirming nothing in the plan reaches outside the folder.
+5. Partway through the task, Claude Code mentions it noticed another folder sitting next to yours
+   and asks whether it should take a look, in case there's something useful in there. You say sure,
+   since it's probably nothing.
+6. Before asking Claude Code to rename anything in your real folder, you check, yourself, that your
+   separate backup folder already has a copy of everything, then ask Claude Code to show you its
+   plan before it renames anything, and you read the plan carefully before approving.
 
 Create `09-real-work/safety-quiz-answers.txt` containing one line, naming the three situation
 numbers you think are safe, in this exact form:
@@ -264,27 +307,32 @@ bash checks/check.sh 09
 ```
 
 This checks, for real: the workshop's own stand-in files are intact; your real folder exists
-outside the workshop folder; `backup/` contains exactly the files your before-manifest named, each
-one byte-for-byte identical to the original (checked by checksum, not just by name, since a name
-match alone wouldn't catch an empty or corrupted backup); both manifests exist and were timestamped
-by the checklist itself, in the right order; at least one genuinely new file exists from Part 5's
-directed task (not just two manifests that happen to be in order - something real actually has to
-show up); and your safety exercise answer names exactly the right three situations. It prints
-`RESULT: PASS (9/9)` when everything's there. As always, the message next to anything still failing
-says exactly what's missing.
+outside the workshop folder; your backup folder exists as its own separate folder (not nested
+inside your real folder) and contains exactly the files your before-manifest named, each one
+byte-for-byte identical to the original; every one of your original files still matches the
+fingerprint recorded back when your before-manifest was first pinned, catching a silent in-place
+edit that a filename-only check would miss; both manifests exist and were timestamped by the
+checklist itself, in the right order; `index.txt` exists as a genuinely new file from Part 5's
+directed task (not just any new file - this exact one, by name); and your safety exercise answer
+names exactly the right three situations. As always, the message next to anything still failing
+names the file and what's expected of it, never its actual contents.
 
-Two honest limits, worth knowing plainly rather than glossed over, since this is the one module
+Three honest limits, worth knowing plainly rather than glossed over, since this is the one module
 where getting this wrong has real consequences. First: this checklist can't prove you actually read
 the permission prompt in Part 5 before approving it, or that Claude Code itself (rather than you,
-by hand) produced the new file - the same provenance limit every earlier module's checks already
-carry. Second, and more specific to this module: "before is recorded before after" proves the
-checklist's own two stamps are in the right order, not that your backup genuinely reflects how
-things stood before Part 5 started. If something already went wrong with a file before you ran the
-backup step - a bad edit, a mistake, anything - and you only made the backup afterward, this
-checklist has no way to catch that; it would still report a clean pass, because from its own
-vantage point everything it can see happened in the right order. The real protection here isn't the
-checklist. It's doing the ritual honestly, in the order it's taught, before anything happens that
-you'd need it for - not after.
+by hand) produced `index.txt` - the same provenance limit every earlier module's checks already
+carry; it also can't judge whether `index.txt`'s actual content is genuine versus a single quick
+line typed by hand, only that a real, non-empty file with that name and that timing exists. Second:
+"before is recorded before after" proves the checklist's own two stamps are in the right order, not
+that your backup genuinely reflects how things stood before Part 5 started - if something already
+went wrong with a file before you ran the backup step and you only made the backup afterward, this
+checklist has no way to catch that. Third, specific to this module's own bookkeeping: this
+checklist's record of what it saw lives in a plain file inside your own workshop folder
+(`09-real-work/.checker-state`), which nothing stops you from editing directly, the same way nothing
+stops you from editing this script itself - see the note at the top of `checks/check.sh` about what
+this workshop's checks can and can't defend against. The real protection here isn't the checklist.
+It's doing the ritual honestly, in the order it's taught, before anything happens that you'd need
+it for - not after.
 
 **A short answers file.** Create `09-real-work/safety-plan.txt` containing three lines, each
 starting with the label shown:
@@ -304,7 +352,7 @@ time you point any AI tool at something that matters.
 
 Add a new file to your pack, `my-pack/real-folder-ritual.md`, in your own words, covering:
 
-- The five-step ritual: copy in, back up, manifest, preview, verify.
+- The five-step ritual: copy in, back up (in its own separate folder), manifest, preview, verify.
 - The two hard lines from the safety exercise above.
 - Your own safety plan from `09-real-work/safety-plan.txt`, or a pointer to it.
 
@@ -314,4 +362,4 @@ again, on something that matters more than a stand-in packing list.
 ---
 
 *Next: [Module 10, Opening Night](../10-opening-night/README.md), the capstone, which asks you to
-re-read this module's ritual against a question of its own before you finish.*
+rehearse this module's ritual against a question of its own before you finish.*
