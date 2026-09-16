@@ -4,10 +4,10 @@ Wade In's arc takes a learner who has never opened a terminal through ten module
 
 **Hands-on by design, not passive text.** No module here completes by reading it. Every module states a required gate before content exists: an artifact you produce, checked two ways. Every module also has a stated **takeaway**: something reusable you're meant to keep, not just proof you did the exercise. Named honestly: most modules' checked artifact and its takeaway are currently two separate things (the checked work is one file, the reusable pack piece is another) rather than the gate directly producing the takeaway - closing that gap for real is still an open design decision, not solved yet.
 
-> **Content status: Modules 01-09 have real, authored content, fixtures, and a working checker
-> script. Module 10 (the capstone) is still skeleton only** - its own checker draws one mechanism
-> from each of Modules 04, 06, 07, and 08, so it's authored last, once those are stable. See
-> `docs/next-actions.md` for what happens next.
+> **Content status: all ten modules have real, authored content, fixtures, and a working
+> checker script**, each with a fresh-context same-model review; Modules 01, 02, and 10 also had
+> a cross-model review pass, and every module has been tried blind, end to end, by a simulated
+> learner before shipping. See `docs/next-actions.md` for what happens next.
 
 ## The gate, in plain terms
 
@@ -18,7 +18,7 @@ Two checks, every module:
 | **Required checklist** | A short script, planned to ship inside the workshop folder, that will check your work against a set of facts: a file that exists, a number that's correct, a set of names that matches. You'll run it yourself, or ask Claude Code to run it, and it will tell you plainly whether you passed. |
 | **A quick write-up, graded for you** | A short answer in your own words about what you did or why, checked by an AI pass against a supplied standard. This part is about judgment calls a script can't make on its own. |
 
-Modules 01-09 have this for real now; Module 10 still doesn't - see the status note above.
+All ten modules have this for real now - see the status note above.
 
 Full design, including exactly what each check can and can't prove: [`docs/workshop-design.md`](../docs/workshop-design.md) §8.
 

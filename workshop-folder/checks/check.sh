@@ -188,6 +188,31 @@ EXPECTED_STANDIN_NOTE_SHA256="3d322629bbf07b27385c321bbc9e7a5a01945555676d2f9a72
 EXPECTED_STANDIN_PACKING_SHA256="f1834bcffc2c2eb9c4ec5b37de0aba444f417560b2c0f0d45182cb74b78c5c81"
 EXPECTED_STANDIN_RECIPE_SHA256="13c259fb430dbee8c8a58f53db27fb3e81f7712000e11ae77b0a067f360bd413"
 
+# Module 10 (the capstone) fixture checksums. The 20 pristine press photos
+# get one aggregate checksum (cat'd in sorted filename order, zero-padded so
+# lexical order matches numeric order) rather than 20 individual constants,
+# same technique Module 08 already uses for its own 25 photos.
+declare -a EXPECTED_CREW_HOURS_DATES=(2026-09-08 2026-09-09 2026-09-10 2026-09-11 2026-09-12 2026-09-13 2026-09-14 2026-09-15)
+crew_hours_expected_sha256() {
+  case "$1" in
+    2026-09-08) echo "58db41183ba5664edf995e3227e9d472a0f15ad3fcfaa422d4ced1ad3d52d9fe" ;;
+    2026-09-09) echo "dda6df253d5bb4611e6b302e18c7e321b323c48d862b4abb38fed2cc4d2cf52c" ;;
+    2026-09-10) echo "a3bcf0735bd87d0db9a0b8c3c0c5c891fda69c4e07b3f377ede277cea31a50ea" ;;
+    2026-09-11) echo "8ebd3c84bad67a24d3170928ccd22de02b2f81ffd60d5d5c4e799abc468ca37f" ;;
+    2026-09-12) echo "0180466fa822f567afd0d94d9cad9556ac177f02202e4260742196545332f0b6" ;;
+    2026-09-13) echo "f58abeb8bc6a82dcbc265929fa7c563b98b7fea792026294cec8e36a98957076" ;;
+    2026-09-14) echo "5df4d1d2cda4f0ae396f2a040c974ad5dfad60bd2a5e449486e5a710b61c6507" ;;
+    2026-09-15) echo "fcbf13ac442c41e6494d4f225ab7304ab34de6c82aefa6f999b98dc386c74a6b" ;;
+    *) echo "" ;;
+  esac
+}
+EXPECTED_OPENING_NIGHT_FIGURES_SHA256="908c7f3f8eaa510bb7a47b22dd825e19718440d0013574c4e4f52a7b04fadfda"
+EXPECTED_PENNY_GUEST_LIST_SHA256="cf36c74f98c4c4f07524bad48a14daf5893414511b954d44d537ab9808ada681"
+EXPECTED_TILGHMAN_GUEST_DRAFT_SHA256="43ea496e872fdabe71b10233c00c1739496aa3a27332a8d108582c85a1a80470"
+EXPECTED_PRESS_PHOTO_MAPPING_SHA256="445691e5c2f886eafd54460e4e763fc56ea1c9f6d18913e64ec03c2a7e2832d2"
+EXPECTED_PRESS_PHOTOS_AGG_SHA256="98d8ffb97af18290d673c36ba1f2d85c98bc7596a928db978b7150c2e6157a60"
+EXPECTED_VIP_CONFIRMATIONS_SHA256="86b330903692c522af546bbed0ccd09f841523dacc66e9f1ccad4b1cf0189b2d"
+
 # --- Module 09 helper functions --------------------------------------------
 # Module 09 (Off the Clock) is the one module whose graded artifacts live in
 # TWO places: this workshop folder's own 09-real-work/ (the checker's
@@ -2448,6 +2473,806 @@ case "$MODULE" in
       fi
     else
       check "safety-plan.txt has all three reflection answers, in your own words" fail
+    fi
+    ;;
+  10)
+    # Module 10, the capstone: five artifacts, each drawing one mechanism
+    # from an earlier module, all bound to genuinely new capstone-only
+    # fixture data (fixtures/capstone/), plus a pack-completeness check.
+    # Every hardening convention from every earlier module applies here too
+    # -- no declare -A, checksum-protected fixtures, symlink/hard-link
+    # rejection, exact-token/context-bound matching, never a bare
+    # anywhere-in-document substring match.
+
+    # === Artifact 1: research brief (Module 05's mechanism) ===================
+    # [structural-only], same contract as Module 05: exists, 4 required
+    # headers verbatim, >=3 distinct-site sources, a comparison table (scoped
+    # to its own section) with no empty cells. Reuses Module 05's own
+    # DDD-fixed logic (registrable-domain approximation + trailing-period
+    # strip for hostname counting; table scoped to its own section, not the
+    # whole document; leading-whitespace-tolerant table rows).
+    EXPECTED_10_RESEARCH="$ROOT/10-capstone/research"
+    RESEARCH10_DIR_OK=true
+    if [[ -e "$EXPECTED_10_RESEARCH" ]]; then
+      REAL_10_RESEARCH="$(cd "$EXPECTED_10_RESEARCH" 2>/dev/null && pwd -P || echo "")"
+      [[ "$REAL_10_RESEARCH" != "$EXPECTED_10_RESEARCH" ]] && RESEARCH10_DIR_OK=false
+    fi
+    BRIEF10="$ROOT/10-capstone/research/av-comparison-brief.md"
+    BRIEF10_LINK_COUNT="$(stat -f '%l' "$BRIEF10" 2>/dev/null || stat -c '%h' "$BRIEF10" 2>/dev/null || echo "1")"
+    BRIEF10_REAL_FILE=false
+    if [[ "$RESEARCH10_DIR_OK" == false ]]; then
+      check "10-capstone/research/av-comparison-brief.md exists and is non-empty (10-capstone/research/ is a symlink, not a real directory)" fail
+    elif [[ -L "$BRIEF10" ]]; then
+      check "10-capstone/research/av-comparison-brief.md exists and is non-empty (found a symlink, not a real file)" fail
+    elif [[ -f "$BRIEF10" && "$BRIEF10_LINK_COUNT" != "1" ]]; then
+      check "10-capstone/research/av-comparison-brief.md exists and is non-empty (found a hard link, not an independently-written file)" fail
+    elif [[ -s "$BRIEF10" ]]; then
+      check "10-capstone/research/av-comparison-brief.md exists and is non-empty" pass
+      BRIEF10_REAL_FILE=true
+    else
+      check "10-capstone/research/av-comparison-brief.md exists and is non-empty" fail
+    fi
+
+    REQUIRED_HEADERS10=("## Vendors Compared" "## Pricing" "## Equipment Included" "## Recommendation")
+    if [[ "$BRIEF10_REAL_FILE" == true ]]; then
+      MISSING_HEADERS10=()
+      for h in "${REQUIRED_HEADERS10[@]}"; do
+        grep -qxF "$h" "$BRIEF10" 2>/dev/null || MISSING_HEADERS10+=("$h")
+      done
+      if [[ "${#MISSING_HEADERS10[@]}" -eq 0 ]]; then
+        check "av-comparison-brief.md has all 4 required section headers" pass
+      else
+        check "av-comparison-brief.md has all 4 required section headers (still missing: ${MISSING_HEADERS10[*]})" fail
+      fi
+    else
+      check "av-comparison-brief.md has all 4 required section headers" fail
+    fi
+
+    if [[ "$BRIEF10_REAL_FILE" == true ]]; then
+      HOSTNAMES10="$(grep -oE 'https?://[A-Za-z0-9.-]+' "$BRIEF10" 2>/dev/null \
+        | sed -E 's#^https?://##' \
+        | sed -E 's/\.$//' \
+        | tr '[:upper:]' '[:lower:]' \
+        | awk -F'.' '{
+            n=NF
+            if (n>=3) {
+              last2=$(n-1)"."$n
+              if (last2=="co.uk" || last2=="org.uk" || last2=="ac.uk" || last2=="gov.uk" || last2=="com.au" || last2=="net.au" || last2=="org.au" || last2=="co.nz" || last2=="co.jp" || last2=="co.in" || last2=="co.za" || last2=="com.br" || last2=="com.mx") {
+                print $(n-2)"."$(n-1)"."$n
+                next
+              }
+            }
+            if (n>=2) print $(n-1)"."$n; else print $0
+          }' \
+        | sort -u)"
+      HOSTNAME10_COUNT="$(printf '%s\n' "$HOSTNAMES10" | grep -c '.' || true)"
+      if [[ "$HOSTNAME10_COUNT" -ge 3 ]]; then
+        check "av-comparison-brief.md cites source URLs from at least 3 distinct sites (found $HOSTNAME10_COUNT)" pass
+      else
+        check "av-comparison-brief.md cites source URLs from at least 3 distinct sites (found $HOSTNAME10_COUNT)" fail
+      fi
+    else
+      check "av-comparison-brief.md cites source URLs from at least 3 distinct sites" fail
+    fi
+
+    if [[ "$BRIEF10_REAL_FILE" == true ]]; then
+      PRICING10_SECTION="$(awk '/^## Pricing[[:space:]]*$/{flag=1; next} /^## /{flag=0} flag' "$BRIEF10" 2>/dev/null)"
+      TABLE10_LINES="$(printf '%s\n' "$PRICING10_SECTION" | grep -E '^[[:space:]]*\|.*\|[[:space:]]*$' 2>/dev/null || true)"
+      CONTENT10_ROWS=0; EMPTY10_CELL_ROWS=0; HAS10_SEPARATOR=false
+      while IFS= read -r raw_line; do
+        [[ -z "$raw_line" ]] && continue
+        line="$(printf '%s' "$raw_line" | sed 's/^[[:space:]]*//')"
+        STRIPPED10="$(printf '%s' "$line" | sed 's/[|:*[:space:]-]//g')"
+        if [[ -z "$STRIPPED10" ]]; then HAS10_SEPARATOR=true; continue; fi
+        CONTENT10_ROWS=$((CONTENT10_ROWS + 1))
+        INNER10="${line#|}"; INNER10="${INNER10%|}"
+        ROW10_EMPTY=false
+        OLDIFS="$IFS"; IFS='|'; read -ra CELLS10 <<< "$INNER10"; IFS="$OLDIFS"
+        for cell in "${CELLS10[@]}"; do
+          TRIMMED10="$(printf '%s' "$cell" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+          [[ -z "$TRIMMED10" ]] && ROW10_EMPTY=true
+        done
+        [[ "$ROW10_EMPTY" == true ]] && EMPTY10_CELL_ROWS=$((EMPTY10_CELL_ROWS + 1))
+      done <<< "$TABLE10_LINES"
+      if [[ "$HAS10_SEPARATOR" == true && "$CONTENT10_ROWS" -ge 4 && "$EMPTY10_CELL_ROWS" -eq 0 ]]; then
+        check "av-comparison-brief.md has a comparison table with at least 3 rows and no empty cells" pass
+      else
+        check "av-comparison-brief.md has a comparison table with at least 3 rows and no empty cells" fail
+      fi
+    else
+      check "av-comparison-brief.md has a comparison table with at least 3 rows and no empty cells" fail
+    fi
+
+    # === Artifact 2: script tally (Module 04's mechanism) ======================
+    EXPECTED_10_CREW="$ROOT/10-capstone/crew"
+    CREW_DIR_OK=true
+    if [[ -e "$EXPECTED_10_CREW" ]]; then
+      REAL_10_CREW="$(cd "$EXPECTED_10_CREW" 2>/dev/null && pwd -P || echo "")"
+      [[ "$REAL_10_CREW" != "$EXPECTED_10_CREW" ]] && CREW_DIR_OK=false
+    fi
+    if [[ "$CREW_DIR_OK" == true && -d "$EXPECTED_10_CREW" ]]; then
+      check "10-capstone/crew/ directory exists (not a symlink)" pass
+    else
+      check "10-capstone/crew/ directory exists (not a symlink)" fail
+      CREW_DIR_OK=false
+    fi
+
+    CREW_REPORT="$ROOT/10-capstone/crew/crew-report.txt"
+    CREW_REPORT_LINK_COUNT="$(stat -f '%l' "$CREW_REPORT" 2>/dev/null || stat -c '%h' "$CREW_REPORT" 2>/dev/null || echo "1")"
+    CREW_REPORT_OK=false
+    if [[ "$CREW_DIR_OK" == false ]]; then
+      check "10-capstone/crew/crew-report.txt exists and is non-empty (10-capstone/crew/ isn't set up as a real directory yet)" fail
+    elif [[ -L "$CREW_REPORT" ]]; then
+      check "10-capstone/crew/crew-report.txt exists and is non-empty (found a symlink, not a real file)" fail
+    elif [[ -f "$CREW_REPORT" && "$CREW_REPORT_LINK_COUNT" != "1" ]]; then
+      check "10-capstone/crew/crew-report.txt exists and is non-empty (found a hard link, not an independently-written file)" fail
+    elif [[ -s "$CREW_REPORT" ]]; then
+      check "10-capstone/crew/crew-report.txt exists and is non-empty" pass
+      CREW_REPORT_OK=true
+    else
+      check "10-capstone/crew/crew-report.txt exists and is non-empty" fail
+    fi
+
+    CREW_SCRIPT_FOUND=false
+    if [[ "$CREW_DIR_OK" == true ]]; then
+      for f in "$EXPECTED_10_CREW"/*; do
+        [[ -e "$f" ]] || continue
+        BASE_NAME="$(basename "$f")"
+        if [[ "$BASE_NAME" != "crew-report.txt" && "$BASE_NAME" != "answers.txt" && -f "$f" && ! -L "$f" && -s "$f" ]]; then
+          F_LINK_COUNT="$(stat -f '%l' "$f" 2>/dev/null || stat -c '%h' "$f" 2>/dev/null || echo "1")"
+          [[ "$F_LINK_COUNT" != "1" ]] && continue
+          CREW_SCRIPT_FOUND=true
+          break
+        fi
+      done
+    fi
+    if [[ "$CREW_SCRIPT_FOUND" == true ]]; then
+      check "10-capstone/crew/ contains the script itself, not just the report" pass
+    else
+      check "10-capstone/crew/ contains the script itself, not just the report" fail
+    fi
+
+    CREW_FIXTURES_OK=true
+    if [[ "$CHECKSUM_TOOL_AVAILABLE" == false ]]; then
+      check "all 8 crew-hours fixtures unmodified (couldn't verify: no checksum tool found on this system - contact the workshop)" fail
+      CREW_FIXTURES_OK=false
+    else
+      BAD_CREW_FIXTURES=()
+      for d in "${EXPECTED_CREW_HOURS_DATES[@]}"; do
+        FPATH="$ROOT/fixtures/capstone/crew-hours-$d.txt"
+        EXPECTED_SUM="$(crew_hours_expected_sha256 "$d")"
+        ACTUAL_SUM="$(file_checksum "$FPATH" 2>/dev/null || echo "MISSING_FIXTURE")"
+        [[ "$ACTUAL_SUM" != "$EXPECTED_SUM" ]] && BAD_CREW_FIXTURES+=("crew-hours-$d.txt")
+      done
+      if [[ "${#BAD_CREW_FIXTURES[@]}" -eq 0 ]]; then
+        check "all 8 crew-hours fixtures unmodified (checksum verified)" pass
+      else
+        check "all 8 crew-hours fixtures unmodified (contact the workshop, not your own mistake - affected: ${BAD_CREW_FIXTURES[*]})" fail
+        CREW_FIXTURES_OK=false
+      fi
+    fi
+
+    CREW_TOTAL_EXPECTED=0
+    CREW_BEST_DATE=""; CREW_BEST_HOURS=-1
+    CREW_WORST_DATE=""; CREW_WORST_HOURS=-1
+    if [[ "$CREW_FIXTURES_OK" == true ]]; then
+      for d in "${EXPECTED_CREW_HOURS_DATES[@]}"; do
+        FPATH="$ROOT/fixtures/capstone/crew-hours-$d.txt"
+        LINE="$(grep -m1 '^Hours:' "$FPATH" 2>/dev/null || true)"
+        N="$(echo "$LINE" | sed 's/^Hours:[[:space:]]*//' | sed 's/[[:space:]]*$//')"
+        CREW_TOTAL_EXPECTED=$((CREW_TOTAL_EXPECTED + N))
+        if [[ "$N" -gt "$CREW_BEST_HOURS" ]]; then CREW_BEST_HOURS="$N"; CREW_BEST_DATE="$d"; fi
+        if [[ "$CREW_WORST_HOURS" -eq -1 || "$N" -lt "$CREW_WORST_HOURS" ]]; then CREW_WORST_HOURS="$N"; CREW_WORST_DATE="$d"; fi
+      done
+    fi
+
+    read_crew_label() {
+      local label="$1"
+      [[ "$CREW_REPORT_OK" == true ]] || { echo ""; return; }
+      local line
+      line="$(grep -m1 "^$label" "$CREW_REPORT" 2>/dev/null || true)"
+      echo "$line" | sed "s/^$label//" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'
+    }
+
+    if [[ "$CREW_REPORT_OK" == true && "$CREW_FIXTURES_OK" == true ]]; then
+      ACTUAL_CREW_TOTAL="$(read_crew_label 'TOTAL_HOURS:')"
+      if [[ "$ACTUAL_CREW_TOTAL" == "$CREW_TOTAL_EXPECTED" ]]; then
+        check "crew-report.txt has the exact total hours, recomputed from the 8 fixtures" pass
+      else
+        check "crew-report.txt has the exact total hours, recomputed from the 8 fixtures" fail
+      fi
+    else
+      check "crew-report.txt has the exact total hours, recomputed from the 8 fixtures (contact the workshop, not your own mistake)" fail
+    fi
+
+    if [[ "$CREW_REPORT_OK" == true && "$CREW_FIXTURES_OK" == true ]]; then
+      ACTUAL_CREW_BEST_DATE="$(read_crew_label 'BUSIEST_DATE:')"
+      ACTUAL_CREW_BEST_HOURS="$(read_crew_label 'BUSIEST_HOURS:')"
+      if [[ "$ACTUAL_CREW_BEST_DATE" == "$CREW_BEST_DATE" && "$ACTUAL_CREW_BEST_HOURS" == "$CREW_BEST_HOURS" ]]; then
+        check "crew-report.txt has the exact busiest day, recomputed from the 8 fixtures" pass
+      else
+        check "crew-report.txt has the exact busiest day, recomputed from the 8 fixtures" fail
+      fi
+    else
+      check "crew-report.txt has the exact busiest day, recomputed from the 8 fixtures (contact the workshop, not your own mistake)" fail
+    fi
+
+    if [[ "$CREW_REPORT_OK" == true && "$CREW_FIXTURES_OK" == true ]]; then
+      ACTUAL_CREW_WORST_DATE="$(read_crew_label 'LIGHTEST_DATE:')"
+      ACTUAL_CREW_WORST_HOURS="$(read_crew_label 'LIGHTEST_HOURS:')"
+      if [[ "$ACTUAL_CREW_WORST_DATE" == "$CREW_WORST_DATE" && "$ACTUAL_CREW_WORST_HOURS" == "$CREW_WORST_HOURS" ]]; then
+        check "crew-report.txt has the exact lightest day, recomputed from the 8 fixtures" pass
+      else
+        check "crew-report.txt has the exact lightest day, recomputed from the 8 fixtures" fail
+      fi
+    else
+      check "crew-report.txt has the exact lightest day, recomputed from the 8 fixtures (contact the workshop, not your own mistake)" fail
+    fi
+
+    ANSWERS10_CREW="$ROOT/10-capstone/crew/answers.txt"
+    ANSWERS10_CREW_LINK_COUNT="$(stat -f '%l' "$ANSWERS10_CREW" 2>/dev/null || stat -c '%h' "$ANSWERS10_CREW" 2>/dev/null || echo "1")"
+    if [[ -L "$ANSWERS10_CREW" ]]; then
+      check "10-capstone/crew/answers.txt has a genuine reflection answer" fail
+    elif [[ -f "$ANSWERS10_CREW" && "$ANSWERS10_CREW_LINK_COUNT" != "1" ]]; then
+      check "10-capstone/crew/answers.txt has a genuine reflection answer" fail
+    elif [[ -f "$ANSWERS10_CREW" ]]; then
+      LINE="$(grep -m1 "^PLAN_FIRST:" "$ANSWERS10_CREW" 2>/dev/null || true)"
+      VALUE="$(echo "$LINE" | sed "s/^PLAN_FIRST://" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+      PLACEHOLDER_PLAN10="<did you ask for a plan before running anything - yes or no, and what happened?>"
+      if [[ -n "$VALUE" && "$VALUE" != "$PLACEHOLDER_PLAN10" ]]; then
+        check "10-capstone/crew/answers.txt has a genuine reflection answer" pass
+      else
+        check "10-capstone/crew/answers.txt has a genuine reflection answer" fail
+      fi
+    else
+      check "10-capstone/crew/answers.txt has a genuine reflection answer" fail
+    fi
+
+    # === Artifact 3: budget doc for Bruner (Module 06's mechanism) =============
+    EXPECTED_10_BUDGET="$ROOT/10-capstone/budget"
+    BUDGET_DIR_OK=true
+    if [[ -e "$EXPECTED_10_BUDGET" ]]; then
+      REAL_10_BUDGET="$(cd "$EXPECTED_10_BUDGET" 2>/dev/null && pwd -P || echo "")"
+      [[ "$REAL_10_BUDGET" != "$EXPECTED_10_BUDGET" ]] && BUDGET_DIR_OK=false
+    fi
+    BUDGET_DOC="$ROOT/10-capstone/budget/opening-night-budget.md"
+    BUDGET_LINK_COUNT="$(stat -f '%l' "$BUDGET_DOC" 2>/dev/null || stat -c '%h' "$BUDGET_DOC" 2>/dev/null || echo "1")"
+    BUDGET_REAL_FILE=false
+    if [[ "$BUDGET_DIR_OK" == false ]]; then
+      check "10-capstone/budget/opening-night-budget.md exists and is non-empty (10-capstone/budget/ is a symlink, not a real directory)" fail
+    elif [[ -L "$BUDGET_DOC" ]]; then
+      check "10-capstone/budget/opening-night-budget.md exists and is non-empty (found a symlink, not a real file)" fail
+    elif [[ -f "$BUDGET_DOC" && "$BUDGET_LINK_COUNT" != "1" ]]; then
+      check "10-capstone/budget/opening-night-budget.md exists and is non-empty (found a hard link, not an independently-written file)" fail
+    elif [[ -s "$BUDGET_DOC" ]]; then
+      check "10-capstone/budget/opening-night-budget.md exists and is non-empty" pass
+      BUDGET_REAL_FILE=true
+    else
+      check "10-capstone/budget/opening-night-budget.md exists and is non-empty" fail
+    fi
+
+    WORD10_COUNT=0
+    if [[ "$BUDGET_REAL_FILE" == true ]]; then
+      WORD10_COUNT="$(wc -w < "$BUDGET_DOC" 2>/dev/null | tr -d ' ')"
+      if [[ "$WORD10_COUNT" -ge 150 && "$WORD10_COUNT" -le 400 ]]; then
+        check "opening-night-budget.md is 150-400 words long (found $WORD10_COUNT)" pass
+      else
+        check "opening-night-budget.md is 150-400 words long (found $WORD10_COUNT)" fail
+      fi
+    else
+      check "opening-night-budget.md is 150-400 words long" fail
+    fi
+
+    REQUIRED_BUDGET_HEADERS=("## Summary" "## Budget Breakdown" "## Notable Items" "## Comparison to Last Season" "## Prepared By")
+    if [[ "$BUDGET_REAL_FILE" == true ]]; then
+      MISSING_BUDGET_HEADERS=()
+      for h in "${REQUIRED_BUDGET_HEADERS[@]}"; do
+        grep -qxF "$h" "$BUDGET_DOC" 2>/dev/null || MISSING_BUDGET_HEADERS+=("$h")
+      done
+      if [[ "${#MISSING_BUDGET_HEADERS[@]}" -eq 0 ]]; then
+        check "opening-night-budget.md has all 5 required section headers, written exactly as specified" pass
+      else
+        check "opening-night-budget.md has all 5 required section headers, written exactly as specified (still missing: ${MISSING_BUDGET_HEADERS[*]})" fail
+      fi
+    else
+      check "opening-night-budget.md has all 5 required section headers, written exactly as specified" fail
+    fi
+
+    BUDGET_FIXTURE="$ROOT/fixtures/capstone/opening-night-raw-figures.txt"
+    BUDGET_FIXTURE_SUM="$(file_checksum "$BUDGET_FIXTURE" 2>/dev/null || echo "MISSING_FIXTURE")"
+    if [[ "$BUDGET_FIXTURE_SUM" != "$EXPECTED_OPENING_NIGHT_FIGURES_SHA256" ]]; then
+      check "opening-night-budget.md includes the exact total budget (workshop fixture doesn't match its expected content - contact the workshop, not your own mistake)" fail
+      check "opening-night-budget.md includes the expected attendance (workshop fixture doesn't match its expected content - contact the workshop, not your own mistake)" fail
+      check "opening-night-budget.md includes the advance ticket price (workshop fixture doesn't match its expected content - contact the workshop, not your own mistake)" fail
+      check "opening-night-budget.md includes the entertainment fee (workshop fixture doesn't match its expected content - contact the workshop, not your own mistake)" fail
+    else
+      ENT_FEE="$(grep -oE 'Entertainment fee: \$[0-9,]+' "$BUDGET_FIXTURE" | grep -oE '[0-9,]+$' | tr -d ',')"
+      AV_FEE="$(grep -oE 'AV and sound rental: \$[0-9,]+' "$BUDGET_FIXTURE" | grep -oE '[0-9,]+$' | tr -d ',')"
+      CATERING_FEE="$(grep -oE 'Catering: \$[0-9,]+' "$BUDGET_FIXTURE" | grep -oE '[0-9,]+$' | tr -d ',')"
+      SECURITY_FEE="$(grep -oE 'Security staffing: \$[0-9,]+' "$BUDGET_FIXTURE" | grep -oE '[0-9,]+$' | tr -d ',')"
+      ATTENDANCE="$(grep -oE 'Expected attendance: [0-9]+' "$BUDGET_FIXTURE" | grep -oE '[0-9]+$')"
+      TICKET_PRICE="$(grep -oE 'Advance ticket price: \$[0-9]+' "$BUDGET_FIXTURE" | grep -oE '[0-9]+$')"
+      TOTAL_BUDGET_EXPECTED=$((ENT_FEE + AV_FEE + CATERING_FEE + SECURITY_FEE))
+
+      TOTAL_LINE_TOKENS="$(grep -iE 'total' "$BUDGET_DOC" 2>/dev/null | grep -oE '\$?[0-9][0-9,]*' | tr -d '$,')"
+      if [[ "$BUDGET_REAL_FILE" == true ]] && echo "$TOTAL_LINE_TOKENS" | grep -qxF "$TOTAL_BUDGET_EXPECTED"; then
+        check "opening-night-budget.md includes the exact total budget, correctly summed" pass
+      else
+        check "opening-night-budget.md includes the exact total budget, correctly summed" fail
+      fi
+
+      ATTEND_LINE_TOKENS="$(grep -iE 'attend' "$BUDGET_DOC" 2>/dev/null | grep -oE '[0-9][0-9,]*' | tr -d ',')"
+      if [[ "$BUDGET_REAL_FILE" == true ]] && echo "$ATTEND_LINE_TOKENS" | grep -qxF "$ATTENDANCE"; then
+        check "opening-night-budget.md includes the expected attendance" pass
+      else
+        check "opening-night-budget.md includes the expected attendance" fail
+      fi
+
+      TICKET_LINE_TOKENS="$(grep -iE 'ticket|price' "$BUDGET_DOC" 2>/dev/null | grep -oE '\$?[0-9][0-9,]*' | tr -d '$,')"
+      if [[ "$BUDGET_REAL_FILE" == true ]] && echo "$TICKET_LINE_TOKENS" | grep -qxF "$TICKET_PRICE"; then
+        check "opening-night-budget.md includes the advance ticket price" pass
+      else
+        check "opening-night-budget.md includes the advance ticket price" fail
+      fi
+
+      ENT_LINE_TOKENS="$(grep -iE 'entertainment' "$BUDGET_DOC" 2>/dev/null | grep -oE '\$?[0-9][0-9,]*' | tr -d '$,')"
+      if [[ "$BUDGET_REAL_FILE" == true ]] && echo "$ENT_LINE_TOKENS" | grep -qxF "$ENT_FEE"; then
+        check "opening-night-budget.md includes the entertainment fee" pass
+      else
+        check "opening-night-budget.md includes the entertainment fee" fail
+      fi
+    fi
+
+    # === Artifact 4: guest list merge (Module 07's mechanism) ==================
+    PENNY_GUEST_FIXTURE="$ROOT/fixtures/capstone/penny-guest-list.csv"
+    TILGHMAN_GUEST_FIXTURE="$ROOT/fixtures/capstone/tilghman-guest-draft.csv"
+    GUEST_OUTPUT_DIR="$ROOT/10-capstone/guests"
+    GUEST_OUTPUT_FILE="$GUEST_OUTPUT_DIR/guest-list-clean.csv"
+    REQUIRED_GUEST_HEADER="guest_id,name,comp_tickets,plus_ones,total_admits"
+
+    GUEST_FIXTURES_OK=true
+    PENNY_GUEST_SUM="$(file_checksum "$PENNY_GUEST_FIXTURE" 2>/dev/null || echo "MISSING_FIXTURE")"
+    TILGHMAN_GUEST_SUM="$(file_checksum "$TILGHMAN_GUEST_FIXTURE" 2>/dev/null || echo "MISSING_FIXTURE")"
+    if [[ "$PENNY_GUEST_SUM" != "$EXPECTED_PENNY_GUEST_LIST_SHA256" || "$TILGHMAN_GUEST_SUM" != "$EXPECTED_TILGHMAN_GUEST_DRAFT_SHA256" ]]; then
+      GUEST_FIXTURES_OK=false
+      check "workshop fixtures penny-guest-list.csv and tilghman-guest-draft.csv match their expected content (contact the workshop, not your own mistake)" fail
+    else
+      check "workshop fixtures penny-guest-list.csv and tilghman-guest-draft.csv match their expected content" pass
+    fi
+
+    GUEST_OUTPUT_DIR_OK=true
+    if [[ -e "$GUEST_OUTPUT_DIR" ]]; then
+      REAL_GUEST_OUTPUT_DIR="$(cd "$GUEST_OUTPUT_DIR" 2>/dev/null && pwd -P || echo "")"
+      [[ "$REAL_GUEST_OUTPUT_DIR" != "$GUEST_OUTPUT_DIR" ]] && GUEST_OUTPUT_DIR_OK=false
+    else
+      GUEST_OUTPUT_DIR_OK=false
+    fi
+    GUEST_OUTPUT_LINK_COUNT="$(stat -f '%l' "$GUEST_OUTPUT_FILE" 2>/dev/null || stat -c '%h' "$GUEST_OUTPUT_FILE" 2>/dev/null || echo "1")"
+    GUEST_LEARNER_FILE_OK=false
+    if [[ "$GUEST_OUTPUT_DIR_OK" == false ]]; then
+      check "10-capstone/guests/guest-list-clean.csv exists (10-capstone/guests/ is a symlink, not a real directory)" fail
+    elif [[ -L "$GUEST_OUTPUT_FILE" ]]; then
+      check "10-capstone/guests/guest-list-clean.csv exists (found a symlink, not a real file)" fail
+    elif [[ -f "$GUEST_OUTPUT_FILE" && "$GUEST_OUTPUT_LINK_COUNT" != "1" ]]; then
+      check "10-capstone/guests/guest-list-clean.csv exists (found a hard link, not an independently-written file)" fail
+    elif [[ -s "$GUEST_OUTPUT_FILE" ]]; then
+      check "10-capstone/guests/guest-list-clean.csv exists and is non-empty" pass
+      GUEST_LEARNER_FILE_OK=true
+    else
+      check "10-capstone/guests/guest-list-clean.csv exists and is non-empty" fail
+    fi
+
+    if [[ "$GUEST_LEARNER_FILE_OK" == true ]]; then
+      ACTUAL_GUEST_HEADER="$(sed -n '1p' "$GUEST_OUTPUT_FILE" 2>/dev/null)"
+      ACTUAL_GUEST_HEADER="${ACTUAL_GUEST_HEADER%$'\r'}"
+      ACTUAL_GUEST_HEADER_TRIMMED="$(printf '%s' "$ACTUAL_GUEST_HEADER" | awk -F',' '{for(i=1;i<=NF;i++){gsub(/^[ \t]+|[ \t]+$/,"",$i)}; out=$1; for(i=2;i<=NF;i++){out=out","$i}; print out}')"
+      if [[ "$ACTUAL_GUEST_HEADER_TRIMMED" == "$REQUIRED_GUEST_HEADER" ]]; then
+        check "guest-list-clean.csv has the exact required header row" pass
+      else
+        check "guest-list-clean.csv has the exact required header row" fail
+      fi
+    else
+      check "guest-list-clean.csv has the exact required header row" fail
+    fi
+
+    GUEST_EXPECTED_IDS=(); GUEST_EXPECTED_NAME=(); GUEST_EXPECTED_COMP=(); GUEST_EXPECTED_PLUS=()
+    if [[ "$GUEST_FIXTURES_OK" == true ]]; then
+      for SRC in "$TILGHMAN_GUEST_FIXTURE" "$PENNY_GUEST_FIXTURE"; do
+        FIRST_LINE=true
+        while IFS=',' read -r g_id g_name g_comp g_plus; do
+          if [[ "$FIRST_LINE" == true ]]; then FIRST_LINE=false; continue; fi
+          g_id="$(trim_field "${g_id%$'\r'}")"
+          g_name="$(trim_field "$g_name")"
+          g_comp="$(trim_field "$g_comp")"
+          g_plus="$(trim_field "${g_plus%$'\r'}")"
+          [[ -z "$g_id" ]] && continue
+          IDX="-1"
+          [[ "${#GUEST_EXPECTED_IDS[@]}" -gt 0 ]] && IDX="$(array_index_of "$g_id" "${GUEST_EXPECTED_IDS[@]}")"
+          if [[ "$IDX" -ge 0 ]]; then
+            GUEST_EXPECTED_NAME[$IDX]="$g_name"; GUEST_EXPECTED_COMP[$IDX]="$g_comp"; GUEST_EXPECTED_PLUS[$IDX]="$g_plus"
+          else
+            GUEST_EXPECTED_IDS+=("$g_id"); GUEST_EXPECTED_NAME+=("$g_name"); GUEST_EXPECTED_COMP+=("$g_comp"); GUEST_EXPECTED_PLUS+=("$g_plus")
+          fi
+        done < "$SRC"
+      done
+    fi
+    GUEST_EXPECTED_COUNT="${#GUEST_EXPECTED_IDS[@]}"
+
+    GUEST_ACTUAL_IDS=(); GUEST_ACTUAL_NAME=(); GUEST_ACTUAL_COMP=(); GUEST_ACTUAL_PLUS=(); GUEST_ACTUAL_TOTAL=()
+    if [[ "$GUEST_LEARNER_FILE_OK" == true ]]; then
+      FIRST_LINE=true
+      while IFS=',' read -r a_id a_name a_comp a_plus a_total; do
+        if [[ "$FIRST_LINE" == true ]]; then FIRST_LINE=false; continue; fi
+        a_id="$(trim_field "$a_id")"; a_name="$(trim_field "$a_name")"; a_comp="$(trim_field "$a_comp")"
+        a_plus="$(trim_field "$a_plus")"; a_total="$(trim_field "${a_total%$'\r'}")"
+        if [[ -z "$a_id" && -z "$a_name" && -z "$a_comp" && -z "$a_plus" && -z "$a_total" ]]; then continue; fi
+        GUEST_ACTUAL_IDS+=("$a_id"); GUEST_ACTUAL_NAME+=("$a_name"); GUEST_ACTUAL_COMP+=("$a_comp")
+        GUEST_ACTUAL_PLUS+=("$a_plus"); GUEST_ACTUAL_TOTAL+=("$a_total")
+      done < "$GUEST_OUTPUT_FILE"
+    fi
+    GUEST_ACTUAL_COUNT="${#GUEST_ACTUAL_IDS[@]}"
+
+    if [[ "$GUEST_FIXTURES_OK" == true && "$GUEST_LEARNER_FILE_OK" == true && "$GUEST_ACTUAL_COUNT" -eq "$GUEST_EXPECTED_COUNT" ]]; then
+      check "guest-list-clean.csv row count matches the recomputed post-dedup count" pass
+    else
+      check "guest-list-clean.csv row count matches the recomputed post-dedup count" fail
+    fi
+
+    GUEST_ID_SET_OK=true
+    if [[ "$GUEST_FIXTURES_OK" != true || "$GUEST_LEARNER_FILE_OK" != true ]]; then
+      GUEST_ID_SET_OK=false
+    else
+      i=0
+      while [[ $i -lt $GUEST_EXPECTED_COUNT ]]; do
+        eid="${GUEST_EXPECTED_IDS[$i]}"; IDX="-1"
+        [[ "${#GUEST_ACTUAL_IDS[@]}" -gt 0 ]] && IDX="$(array_index_of "$eid" "${GUEST_ACTUAL_IDS[@]}")"
+        [[ "$IDX" -lt 0 ]] && GUEST_ID_SET_OK=false
+        i=$((i + 1))
+      done
+      i=0
+      while [[ $i -lt $GUEST_ACTUAL_COUNT ]]; do
+        aid="${GUEST_ACTUAL_IDS[$i]}"; IDX="-1"
+        [[ "${#GUEST_EXPECTED_IDS[@]}" -gt 0 ]] && IDX="$(array_index_of "$aid" "${GUEST_EXPECTED_IDS[@]}")"
+        [[ "$IDX" -lt 0 ]] && GUEST_ID_SET_OK=false
+        i=$((i + 1))
+      done
+    fi
+    if [[ "$GUEST_ID_SET_OK" == true ]]; then
+      check "the guest-ID set exactly matches the recomputed expected set (no lost rows, no invented rows)" pass
+    else
+      check "the guest-ID set exactly matches the recomputed expected set (no lost rows, no invented rows)" fail
+    fi
+
+    GUEST_FIELDS_OK=true
+    if [[ "$GUEST_FIXTURES_OK" != true || "$GUEST_LEARNER_FILE_OK" != true || "$GUEST_ID_SET_OK" != true ]]; then
+      GUEST_FIELDS_OK=false
+    else
+      i=0
+      while [[ $i -lt $GUEST_EXPECTED_COUNT ]]; do
+        eid="${GUEST_EXPECTED_IDS[$i]}"; IDX="-1"
+        [[ "${#GUEST_ACTUAL_IDS[@]}" -gt 0 ]] && IDX="$(array_index_of "$eid" "${GUEST_ACTUAL_IDS[@]}")"
+        if [[ "$IDX" -lt 0 ]]; then
+          GUEST_FIELDS_OK=false
+        else
+          [[ "${GUEST_ACTUAL_NAME[$IDX]}" != "${GUEST_EXPECTED_NAME[$i]}" ]] && GUEST_FIELDS_OK=false
+          [[ "${GUEST_ACTUAL_COMP[$IDX]}" != "${GUEST_EXPECTED_COMP[$i]}" ]] && GUEST_FIELDS_OK=false
+          [[ "${GUEST_ACTUAL_PLUS[$IDX]}" != "${GUEST_EXPECTED_PLUS[$i]}" ]] && GUEST_FIELDS_OK=false
+        fi
+        i=$((i + 1))
+      done
+    fi
+    if [[ "$GUEST_FIELDS_OK" == true ]]; then
+      check "every surviving guest's name/comp_tickets/plus_ones exactly match the source of truth (Penny's copy wins on conflict)" pass
+    else
+      check "every surviving guest's name/comp_tickets/plus_ones exactly match the source of truth (Penny's copy wins on conflict)" fail
+    fi
+
+    GUEST_TOTAL_OK=true
+    if [[ "$GUEST_LEARNER_FILE_OK" != true || "$GUEST_ACTUAL_COUNT" -eq 0 ]]; then
+      GUEST_TOTAL_OK=false
+    else
+      i=0
+      while [[ $i -lt $GUEST_ACTUAL_COUNT ]]; do
+        comp="${GUEST_ACTUAL_COMP[$i]}"; plus="${GUEST_ACTUAL_PLUS[$i]}"; tot="${GUEST_ACTUAL_TOTAL[$i]}"
+        if [[ "$comp" =~ ^-?[0-9]+$ && "$plus" =~ ^-?[0-9]+$ && "$tot" =~ ^-?[0-9]+$ ]]; then
+          ROW_EXPECTED_TOTAL=$((comp + plus))
+          [[ "$tot" != "$ROW_EXPECTED_TOTAL" ]] && GUEST_TOTAL_OK=false
+        else
+          GUEST_TOTAL_OK=false
+        fi
+        i=$((i + 1))
+      done
+    fi
+    if [[ "$GUEST_TOTAL_OK" == true ]]; then
+      check "every row's total_admits equals comp_tickets + plus_ones" pass
+    else
+      check "every row's total_admits equals comp_tickets + plus_ones" fail
+    fi
+
+    # === Artifact 5: press-photo rename + VIP mail merge (Module 08's mechanism) ===
+    PRESS_MAPPING_CSV="$ROOT/fixtures/capstone/press-photo-mapping.csv"
+    PRESS_MAPPING_SUM="$(file_checksum "$PRESS_MAPPING_CSV" 2>/dev/null || echo "MISSING_FIXTURE")"
+    PRESS_MAPPING_OK=true
+    if [[ "$PRESS_MAPPING_SUM" != "$EXPECTED_PRESS_PHOTO_MAPPING_SHA256" ]]; then
+      PRESS_MAPPING_OK=false
+      check "fixtures/capstone/press-photo-mapping.csv matches its expected content (contact the workshop, not your own mistake)" fail
+    else
+      check "fixtures/capstone/press-photo-mapping.csv matches its expected content" pass
+    fi
+
+    PRESS_PHOTOS_AGG_SUM="$(for i in $(seq -w 1 20); do f="$ROOT/fixtures/capstone/press-photos/PRESS_$i.jpg"; sz="$(wc -c < "$f" 2>/dev/null | tr -d ' ')"; sum="$(file_checksum "$f" 2>/dev/null)"; printf 'PRESS_%s.jpg %s %s\n' "$i" "$sz" "$sum"; done | file_checksum /dev/stdin 2>/dev/null || echo "MISSING_FIXTURE")"
+    PRESS_PHOTOS_FIXTURE_OK=true
+    if [[ "$PRESS_PHOTOS_AGG_SUM" != "$EXPECTED_PRESS_PHOTOS_AGG_SHA256" ]]; then
+      PRESS_PHOTOS_FIXTURE_OK=false
+      check "fixtures/capstone/press-photos/ (20 originals) match their expected content (contact the workshop, not your own mistake)" fail
+    else
+      check "fixtures/capstone/press-photos/ (20 originals) match their expected content" pass
+    fi
+
+    EXPECTED_PRESS_OUT="$ROOT/10-capstone/press-photos"
+    PRESS_OUT_OK=true
+    if [[ -e "$EXPECTED_PRESS_OUT" ]]; then
+      REAL_PRESS_OUT="$(cd "$EXPECTED_PRESS_OUT" 2>/dev/null && pwd -P || echo "")"
+      [[ "$REAL_PRESS_OUT" != "$EXPECTED_PRESS_OUT" ]] && PRESS_OUT_OK=false
+    else
+      PRESS_OUT_OK=false
+    fi
+    if [[ "$PRESS_OUT_OK" == true ]]; then
+      check "10-capstone/press-photos/ directory exists (not a symlink)" pass
+    else
+      check "10-capstone/press-photos/ directory exists (not a symlink)" fail
+    fi
+
+    PRESS_RENAME_OK=true
+    PRESS_RENAME_CORRECT=0
+    if [[ "$PRESS_MAPPING_OK" == true && "$PRESS_PHOTOS_FIXTURE_OK" == true && "$PRESS_OUT_OK" == true ]]; then
+      while IFS=',' read -r orig new; do
+        [[ "$orig" == "original_filename" ]] && continue
+        orig="$(trim_field "${orig%$'\r'}")"; new="$(trim_field "${new%$'\r'}")"
+        [[ -z "$orig" ]] && continue
+        OUT_PATH="$EXPECTED_PRESS_OUT/$new"
+        ORIG_PATH="$ROOT/fixtures/capstone/press-photos/$orig"
+        if [[ -L "$OUT_PATH" ]]; then
+          PRESS_RENAME_OK=false; continue
+        fi
+        if [[ ! -f "$OUT_PATH" ]]; then
+          PRESS_RENAME_OK=false; continue
+        fi
+        OUT_LINK_COUNT="$(stat -f '%l' "$OUT_PATH" 2>/dev/null || stat -c '%h' "$OUT_PATH" 2>/dev/null || echo "1")"
+        if [[ "$OUT_LINK_COUNT" != "1" ]]; then
+          PRESS_RENAME_OK=false; continue
+        fi
+        OUT_SUM="$(file_checksum "$OUT_PATH" 2>/dev/null || echo "")"
+        ORIG_SUM="$(file_checksum "$ORIG_PATH" 2>/dev/null || echo "")"
+        if [[ -n "$OUT_SUM" && "$OUT_SUM" == "$ORIG_SUM" ]]; then
+          PRESS_RENAME_CORRECT=$((PRESS_RENAME_CORRECT + 1))
+        else
+          PRESS_RENAME_OK=false
+        fi
+      done < "$PRESS_MAPPING_CSV"
+    else
+      PRESS_RENAME_OK=false
+    fi
+    if [[ "$PRESS_RENAME_OK" == true && "$PRESS_RENAME_CORRECT" -eq 20 ]]; then
+      check "all 20 photos renamed into 10-capstone/press-photos/, correctly named and byte-identical to their originals" pass
+    else
+      check "all 20 photos renamed into 10-capstone/press-photos/, correctly named and byte-identical to their originals (found $PRESS_RENAME_CORRECT/20 correct)" fail
+    fi
+
+    if [[ "$PRESS_OUT_OK" == true ]]; then
+      PRESS_ACTUAL_COUNT="$(find "$EXPECTED_PRESS_OUT" -mindepth 1 -maxdepth 1 -not -name '.*' 2>/dev/null | wc -l | tr -d ' ')"
+      if [[ "$PRESS_ACTUAL_COUNT" -eq 20 ]]; then
+        check "10-capstone/press-photos/ contains exactly the 20 expected files, no extras" pass
+      else
+        check "10-capstone/press-photos/ contains exactly the 20 expected files, no extras (found $PRESS_ACTUAL_COUNT)" fail
+      fi
+    else
+      check "10-capstone/press-photos/ contains exactly the 20 expected files, no extras" fail
+    fi
+
+    VIP_CSV="$ROOT/fixtures/capstone/vip-confirmations.csv"
+    VIP_CSV_SUM="$(file_checksum "$VIP_CSV" 2>/dev/null || echo "MISSING_FIXTURE")"
+    VIP_CSV_OK=true
+    if [[ "$VIP_CSV_SUM" != "$EXPECTED_VIP_CONFIRMATIONS_SHA256" ]]; then
+      VIP_CSV_OK=false
+      check "fixtures/capstone/vip-confirmations.csv matches its expected content (contact the workshop, not your own mistake)" fail
+    else
+      check "fixtures/capstone/vip-confirmations.csv matches its expected content" pass
+    fi
+
+    EXPECTED_VIP_LETTERS_OUT="$ROOT/10-capstone/vip-letters"
+    VIP_LETTERS_OUT_OK=true
+    if [[ -e "$EXPECTED_VIP_LETTERS_OUT" ]]; then
+      REAL_VIP_LETTERS_OUT="$(cd "$EXPECTED_VIP_LETTERS_OUT" 2>/dev/null && pwd -P || echo "")"
+      [[ "$REAL_VIP_LETTERS_OUT" != "$EXPECTED_VIP_LETTERS_OUT" ]] && VIP_LETTERS_OUT_OK=false
+    fi
+
+    VIP_LETTER_FILES=()
+    VIP_LETTERS_TOTAL_ENTRIES=0
+    if [[ "$VIP_LETTERS_OUT_OK" == true ]]; then
+      VIP_LETTERS_TOTAL_ENTRIES="$(find "$EXPECTED_VIP_LETTERS_OUT" -mindepth 1 -maxdepth 1 -not -name '.*' 2>/dev/null | wc -l | tr -d ' ')"
+      while IFS= read -r -d '' entry; do
+        [[ -L "$entry" ]] && continue
+        if [[ -f "$entry" ]]; then
+          LINK_COUNT="$(stat -f '%l' "$entry" 2>/dev/null || stat -c '%h' "$entry" 2>/dev/null || echo "1")"
+          [[ "$LINK_COUNT" == "1" ]] && VIP_LETTER_FILES+=("$entry")
+        fi
+      done < <(find "$EXPECTED_VIP_LETTERS_OUT" -mindepth 1 -maxdepth 1 -not -name '.*' -print0 2>/dev/null)
+    fi
+
+    if [[ "$VIP_LETTERS_OUT_OK" == false ]]; then
+      check "10-capstone/vip-letters/ contains exactly 5 real letter files, no extras, no symlinks or hard links (10-capstone/vip-letters/ is a symlink, not a real directory)" fail
+    elif [[ "$VIP_LETTERS_TOTAL_ENTRIES" -eq 5 && "${#VIP_LETTER_FILES[@]}" -eq 5 ]]; then
+      check "10-capstone/vip-letters/ contains exactly 5 real letter files, no extras, no symlinks or hard links" pass
+    else
+      check "10-capstone/vip-letters/ contains exactly 5 real letter files, no extras, no symlinks or hard links (found $VIP_LETTERS_TOTAL_ENTRIES entries, ${#VIP_LETTER_FILES[@]} usable)" fail
+    fi
+
+    VIP_ROW_MATCHED=0
+    VIP_CLAIMED=()
+    if [[ "$VIP_CSV_OK" == true && "${#VIP_LETTER_FILES[@]}" -gt 0 ]]; then
+      FIRST_LINE=true
+      while IFS=',' read -r v_name v_date v_party; do
+        if [[ "$FIRST_LINE" == true ]]; then FIRST_LINE=false; continue; fi
+        v_name="$(trim_field "$v_name")"; v_date="$(trim_field "$v_date")"; v_party="$(trim_field "${v_party%$'\r'}")"
+        [[ -z "$v_name" ]] && continue
+        ROW_MATCHED=false
+        for idx in "${!VIP_LETTER_FILES[@]}"; do
+          ALREADY_CLAIMED=false
+          if [[ "${#VIP_CLAIMED[@]}" -gt 0 ]]; then
+            for c in "${VIP_CLAIMED[@]}"; do [[ "$c" == "$idx" ]] && ALREADY_CLAIMED=true; done
+          fi
+          [[ "$ALREADY_CLAIMED" == true ]] && continue
+          CANDIDATE="${VIP_LETTER_FILES[$idx]}"
+          if grep -qF "$v_name" "$CANDIDATE" 2>/dev/null && grep -qF "$v_date" "$CANDIDATE" 2>/dev/null && grep -qE "(^|[^0-9])${v_party}([^0-9]|\$)" "$CANDIDATE" 2>/dev/null; then
+            ROW_MATCHED=true
+            VIP_CLAIMED+=("$idx")
+            break
+          fi
+        done
+        [[ "$ROW_MATCHED" == true ]] && VIP_ROW_MATCHED=$((VIP_ROW_MATCHED + 1))
+      done < "$VIP_CSV"
+    fi
+    if [[ "$VIP_ROW_MATCHED" -eq 5 ]]; then
+      check "all 5 VIP letters contain their row's exact name, event date, and party size from the CSV" pass
+    else
+      check "all 5 VIP letters contain their row's exact name, event date, and party size from the CSV (matched $VIP_ROW_MATCHED/5)" fail
+    fi
+
+    VIP_ALL_NAMES=()
+    if [[ "$VIP_CSV_OK" == true ]]; then
+      FIRST_LINE=true
+      while IFS=',' read -r v_name v_date v_party; do
+        if [[ "$FIRST_LINE" == true ]]; then FIRST_LINE=false; continue; fi
+        v_name="$(trim_field "$v_name")"
+        [[ -z "$v_name" ]] && continue
+        VIP_ALL_NAMES+=("$v_name")
+      done < "$VIP_CSV"
+    fi
+    VIP_EXCLUSIVE_OK=true
+    if [[ "${#VIP_LETTER_FILES[@]}" -eq 0 || "${#VIP_ALL_NAMES[@]}" -eq 0 ]]; then
+      VIP_EXCLUSIVE_OK=false
+    else
+      for CANDIDATE in "${VIP_LETTER_FILES[@]}"; do
+        NAME_HITS=0
+        for nm in "${VIP_ALL_NAMES[@]}"; do
+          grep -qF "$nm" "$CANDIDATE" 2>/dev/null && NAME_HITS=$((NAME_HITS + 1))
+        done
+        [[ "$NAME_HITS" -ne 1 ]] && VIP_EXCLUSIVE_OK=false
+      done
+    fi
+    if [[ "$VIP_EXCLUSIVE_OK" == true ]]; then
+      check "each VIP letter is personalized to exactly one guest, not a shared roster of all five" pass
+    else
+      check "each VIP letter is personalized to exactly one guest, not a shared roster of all five" fail
+    fi
+
+    VIP_PLACEHOLDER_COUNT=0
+    if [[ "${#VIP_LETTER_FILES[@]}" -gt 0 ]]; then
+      for CANDIDATE in "${VIP_LETTER_FILES[@]}"; do
+        C="$(grep -o '{' "$CANDIDATE" 2>/dev/null | wc -l | tr -d ' ')"
+        VIP_PLACEHOLDER_COUNT=$((VIP_PLACEHOLDER_COUNT + C))
+        C2="$(grep -oE '\[[A-Za-z_]+\]|<[A-Za-z_]+>|[A-Za-z_]+_HERE' "$CANDIDATE" 2>/dev/null | wc -l | tr -d ' ')"
+        VIP_PLACEHOLDER_COUNT=$((VIP_PLACEHOLDER_COUNT + C2))
+      done
+      if [[ "$VIP_PLACEHOLDER_COUNT" -eq 0 ]]; then
+        check "zero unfilled template placeholders across the VIP letters (no leftover {, [BRACKETED], <TAGGED>, or _HERE markers)" pass
+      else
+        check "zero unfilled template placeholders across the VIP letters (found $VIP_PLACEHOLDER_COUNT leftover placeholder marker(s))" fail
+      fi
+    else
+      check "zero unfilled template placeholders across the VIP letters (no letter files found to check)" fail
+    fi
+
+    # === Pack completeness gate ===
+    # Checks what modules 01-09 actually produce, not an idealized naming scheme:
+    # three exactly-named files (Modules 01/02, 04, 09), the root CLAUDE.md's
+    # Module 03 headers, and a count-based proxy for the loosely-specified
+    # Modules 05/06/07/08 contributions (each says "add something to my-pack/"
+    # without dictating a filename).
+    MY_PACK_DIR="$ROOT/my-pack"
+    MY_PACK_DIR_OK=true
+    if [[ -e "$MY_PACK_DIR" ]]; then
+      REAL_MY_PACK_DIR="$(cd "$MY_PACK_DIR" 2>/dev/null && pwd -P || echo "")"
+      [[ "$REAL_MY_PACK_DIR" != "$MY_PACK_DIR" ]] && MY_PACK_DIR_OK=false
+    else
+      MY_PACK_DIR_OK=false
+    fi
+    if [[ "$MY_PACK_DIR_OK" == true ]]; then
+      check "my-pack/ directory exists (not a symlink)" pass
+    else
+      check "my-pack/ directory exists (not a symlink)" fail
+    fi
+
+    for pack_check in \
+      "cheatsheet.md:your terminal survival card from Modules 01 and 02" \
+      "recipe-safe-script-direction.md:your safe-script-direction recipe from Module 04" \
+      "real-folder-ritual.md:your real-folder ritual notes from Module 09"; do
+      pack_file="${pack_check%%:*}"
+      pack_label="${pack_check#*:}"
+      PACK_FILE_PATH="$MY_PACK_DIR/$pack_file"
+      PACK_FILE_OK=false
+      if [[ "$MY_PACK_DIR_OK" == true && -f "$PACK_FILE_PATH" && ! -L "$PACK_FILE_PATH" && -s "$PACK_FILE_PATH" ]]; then
+        LINK_COUNT="$(stat -f '%l' "$PACK_FILE_PATH" 2>/dev/null || stat -c '%h' "$PACK_FILE_PATH" 2>/dev/null || echo "1")"
+        [[ "$LINK_COUNT" == "1" ]] && PACK_FILE_OK=true
+      fi
+      if [[ "$PACK_FILE_OK" == true ]]; then
+        check "my-pack/$pack_file exists with real content ($pack_label)" pass
+      else
+        check "my-pack/$pack_file exists with real content ($pack_label)" fail
+      fi
+    done
+
+    ROOT_CLAUDE_MD="$ROOT/CLAUDE.md"
+    ROOT_CLAUDE_MD_LINK_COUNT="$(stat -f '%l' "$ROOT_CLAUDE_MD" 2>/dev/null || stat -c '%h' "$ROOT_CLAUDE_MD" 2>/dev/null || echo "1")"
+    ROOT_CLAUDE_MD_OK=false
+    if [[ -f "$ROOT_CLAUDE_MD" && ! -L "$ROOT_CLAUDE_MD" && "$ROOT_CLAUDE_MD_LINK_COUNT" == "1" ]]; then
+      if grep -Fxq '## Never touch `checks/`' "$ROOT_CLAUDE_MD" 2>/dev/null \
+        && grep -Fxq '## Stay inside this folder unless a module says otherwise' "$ROOT_CLAUDE_MD" 2>/dev/null; then
+        ROOT_CLAUDE_MD_OK=true
+      fi
+    fi
+    if [[ "$ROOT_CLAUDE_MD_OK" == true ]]; then
+      check "the workshop folder's CLAUDE.md still has its original headers after Module 03's edit" pass
+    else
+      check "the workshop folder's CLAUDE.md still has its original headers after Module 03's edit" fail
+    fi
+
+    MY_PACK_EXTRA_COUNT=0
+    if [[ "$MY_PACK_DIR_OK" == true ]]; then
+      while IFS= read -r -d '' entry; do
+        [[ -L "$entry" ]] && continue
+        BASE_NAME="$(basename "$entry")"
+        case "$BASE_NAME" in
+          .gitkeep|cheatsheet.md|recipe-safe-script-direction.md|real-folder-ritual.md) continue ;;
+        esac
+        if [[ -f "$entry" && -s "$entry" ]]; then
+          LINK_COUNT="$(stat -f '%l' "$entry" 2>/dev/null || stat -c '%h' "$entry" 2>/dev/null || echo "1")"
+          [[ "$LINK_COUNT" == "1" ]] && MY_PACK_EXTRA_COUNT=$((MY_PACK_EXTRA_COUNT + 1))
+        fi
+      done < <(find "$MY_PACK_DIR" -mindepth 1 -not -name '.*' -print0 2>/dev/null)
+    fi
+    if [[ "$MY_PACK_EXTRA_COUNT" -ge 5 ]]; then
+      check "my-pack/ has real entries from Modules 05-08 too (found $MY_PACK_EXTRA_COUNT beyond the three named files, need at least 5)" pass
+    else
+      check "my-pack/ has real entries from Modules 05-08 too (found $MY_PACK_EXTRA_COUNT beyond the three named files, need at least 5)" fail
+    fi
+
+    # === Tier 2: own-words capstone reflection ===
+    CAPSTONE_ANSWERS="$ROOT/10-capstone/answers.txt"
+    CAPSTONE_ANSWERS_OK=false
+    if [[ -f "$CAPSTONE_ANSWERS" && ! -L "$CAPSTONE_ANSWERS" ]]; then
+      LINK_COUNT="$(stat -f '%l' "$CAPSTONE_ANSWERS" 2>/dev/null || stat -c '%h' "$CAPSTONE_ANSWERS" 2>/dev/null || echo "1")"
+      [[ "$LINK_COUNT" == "1" ]] && CAPSTONE_ANSWERS_OK=true
+    fi
+    ANSWERS_WORDS=0
+    if [[ "$CAPSTONE_ANSWERS_OK" == true ]]; then
+      ANSWERS_WORDS="$(wc -w < "$CAPSTONE_ANSWERS" 2>/dev/null | tr -d ' ')"
+    fi
+    if [[ "$CAPSTONE_ANSWERS_OK" == true && "$ANSWERS_WORDS" -ge 40 ]]; then
+      check "10-capstone/answers.txt exists with a real, substantial reflection (own words, not copy-pasted instructions)" pass
+    else
+      check "10-capstone/answers.txt exists with a real, substantial reflection (own words, not copy-pasted instructions)" fail
     fi
     ;;
   *)
