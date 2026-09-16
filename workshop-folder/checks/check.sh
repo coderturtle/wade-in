@@ -791,21 +791,29 @@ case "$MODULE" in
     PLACEHOLDER_RULE03="<one house rule you wrote and what specific Double Deuce filing quirk it responds to>"
     PLACEHOLDER_CHECK03="<how you checked the corrected file yourself, against the memo, rather than trusting it on sight>"
     PLACEHOLDER_CHANGE03="<in your own words, what will actually be different about a session's behavior now that CLAUDE.md has these rules>"
+    # Added 2026-09-16, part of this workshop's own Module 09/10 safety
+    # remediation: the CLAUDE.md-is-an-instruction-not-a-lock caveat moved
+    # here, to where the file is first introduced, so a learner's mental
+    # model of what it does is corrected at formation time rather than five
+    # modules later. This field checks that landed, not just that the
+    # module's prose mentions it.
+    PLACEHOLDER_STILLMYJOB03="<even with a \"never touch\" rule sitting in CLAUDE.md, what's still your own responsibility to actually watch for?>"
     if [[ "$FILES_DIR_OK" == false ]]; then
-      check "03-files/answers.txt has all three reflection answers, in your own words (03-files/ is a symlink, not a real directory)" fail
+      check "03-files/answers.txt has all four reflection answers, in your own words (03-files/ is a symlink, not a real directory)" fail
     elif [[ -L "$ANSWERS03" ]]; then
-      check "03-files/answers.txt has all three reflection answers, in your own words (found a symlink, not a real file)" fail
+      check "03-files/answers.txt has all four reflection answers, in your own words (found a symlink, not a real file)" fail
     elif [[ -f "$ANSWERS03" && "$ANSWERS03_LINK_COUNT" != "1" ]]; then
-      check "03-files/answers.txt has all three reflection answers, in your own words (found a hard link, not an independently-written file)" fail
+      check "03-files/answers.txt has all four reflection answers, in your own words (found a hard link, not an independently-written file)" fail
     elif [[ -f "$ANSWERS03" ]]; then
       MISSING_LABELS=()
       # Bash-3.2-safe case statement, not an associative array -- see the
       # matching comment on Module 01's identical pattern, above, for why.
-      for label in "HOUSE_RULE:" "WHAT_I_CHECKED:" "WHAT_CHANGES:"; do
+      for label in "HOUSE_RULE:" "WHAT_I_CHECKED:" "WHAT_CHANGES:" "STILL_MY_JOB:"; do
         case "$label" in
           "HOUSE_RULE:") EXPECTED_PLACEHOLDER="$PLACEHOLDER_RULE03" ;;
           "WHAT_I_CHECKED:") EXPECTED_PLACEHOLDER="$PLACEHOLDER_CHECK03" ;;
           "WHAT_CHANGES:") EXPECTED_PLACEHOLDER="$PLACEHOLDER_CHANGE03" ;;
+          "STILL_MY_JOB:") EXPECTED_PLACEHOLDER="$PLACEHOLDER_STILLMYJOB03" ;;
         esac
         LINE="$(grep -m1 "^$label" "$ANSWERS03" 2>/dev/null || true)"
         VALUE="$(echo "$LINE" | sed "s/^$label//" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
@@ -814,12 +822,12 @@ case "$MODULE" in
         fi
       done
       if [[ "${#MISSING_LABELS[@]}" -eq 0 ]]; then
-        check "03-files/answers.txt has all three reflection answers, in your own words" pass
+        check "03-files/answers.txt has all four reflection answers, in your own words" pass
       else
-        check "03-files/answers.txt has all three reflection answers, in your own words (still needed: ${MISSING_LABELS[*]})" fail
+        check "03-files/answers.txt has all four reflection answers, in your own words (still needed: ${MISSING_LABELS[*]})" fail
       fi
     else
-      check "03-files/answers.txt has all three reflection answers, in your own words" fail
+      check "03-files/answers.txt has all four reflection answers, in your own words" fail
     fi
     ;;
   04)
@@ -2071,15 +2079,19 @@ case "$MODULE" in
     ;;
   09)
     # Module 09 (Off the Clock) is the first and only module that leaves the
-    # workshop sandbox. Its artifacts live in two places: this workshop
+    # workshop sandbox. Its artifacts live in three places: this workshop
     # folder's own 09-real-work/ (the checker's bookkeeping - manifests, the
-    # safety quiz answer, the safety plan) and a real folder OUTSIDE the
+    # safety quiz answer, the safety plan), a real folder OUTSIDE the
     # workshop folder entirely, at $HOME/wade-in-real-folder (the learner's
-    # own real-or-stand-in files and their backup). Hard privacy rule,
-    # audited directly, not just intended: this case block computes
-    # checksums (which necessarily read file bytes) but never prints,
-    # extracts, or otherwise displays any file's actual content anywhere -
-    # every message below names files, checksums, and counts only.
+    # own real-or-stand-in files), and - as of this workshop's own Module
+    # 09/10 safety remediation - a SEPARATE, SIBLING folder at
+    # $HOME/wade-in-real-backup, deliberately not nested inside the real
+    # folder so a session pointed at the real folder never has the backup
+    # in view. Hard privacy rule, audited directly, not just intended: this
+    # case block computes checksums (which necessarily read file bytes) but
+    # never prints, extracts, or otherwise displays any file's actual
+    # content anywhere - every message below names files, checksums, and
+    # counts only.
     STATE_DIR="$ROOT/09-real-work"
     # An unset/empty $HOME falls back to $ROOT inside real_folder_path(),
     # which used to fail silently downstream with a misleading "still
@@ -2091,7 +2103,15 @@ case "$MODULE" in
     HOME_UNSET=false
     [[ -z "${HOME:-}" ]] && HOME_UNSET=true
     REAL_FOLDER="$(real_folder_path)"
-    REAL_BACKUP="$REAL_FOLDER/backup"
+    # Remediation, 2026-09-16: the backup now lives in its OWN sibling
+    # folder, never nested inside $REAL_FOLDER -- found by this workshop's
+    # own Workshop Review Panel (Security-Conscious Reviewer persona) that a
+    # backup living inside the same folder a session is given access to is
+    # protected only by wording, not structure. Two separate folders means a
+    # session never has backup/ in view at all unless a human deliberately
+    # points it there -- a real boundary, though still not an absolute lock
+    # (the module's own text names that limit plainly).
+    REAL_BACKUP="${HOME:-$ROOT}/wade-in-real-backup"
     BEFORE_MANIFEST="$STATE_DIR/before-manifest.txt"
     AFTER_MANIFEST="$STATE_DIR/after-manifest.txt"
     QUIZ_FILE="$STATE_DIR/safety-quiz-answers.txt"
@@ -2168,6 +2188,38 @@ case "$MODULE" in
       check "a real folder exists outside the workshop folder, at $REAL_FOLDER ($REAL_FOLDER_PROBLEM)" fail
     fi
 
+    # 2b. Your backup folder is its own real, separate folder -- not a
+    # symlink, and genuinely not nested inside $REAL_FOLDER (a backup
+    # "outside" that's actually a subfolder of the real folder would defeat
+    # the entire point of moving it: a session pointed at $REAL_FOLDER would
+    # still see it).
+    REAL_BACKUP_DIR_OK=true
+    REAL_BACKUP_DIR_PROBLEM=""
+    if [[ "$HOME_UNSET" == true ]]; then
+      REAL_BACKUP_DIR_OK=false
+      REAL_BACKUP_DIR_PROBLEM="your \$HOME environment variable isn't set, so this can't be checked - contact the workshop"
+    elif [[ -L "$REAL_BACKUP" ]]; then
+      REAL_BACKUP_DIR_OK=false
+      REAL_BACKUP_DIR_PROBLEM="found a symlink at $REAL_BACKUP, not a real folder - use mkdir, not ln -s"
+    elif [[ ! -d "$REAL_BACKUP" ]]; then
+      REAL_BACKUP_DIR_OK=false
+      REAL_BACKUP_DIR_PROBLEM="no folder found at $REAL_BACKUP yet"
+    else
+      REAL_BACKUP_RESOLVED="$(cd "$REAL_BACKUP" 2>/dev/null && pwd -P || echo "")"
+      if [[ -z "$REAL_BACKUP_RESOLVED" ]]; then
+        REAL_BACKUP_DIR_OK=false
+        REAL_BACKUP_DIR_PROBLEM="couldn't resolve $REAL_BACKUP"
+      elif [[ "$REAL_FOLDER_OK" == true && ( "$REAL_BACKUP_RESOLVED" == "$REAL_FOLDER_RESOLVED" || "$REAL_BACKUP_RESOLVED" == "$REAL_FOLDER_RESOLVED"/* ) ]]; then
+        REAL_BACKUP_DIR_OK=false
+        REAL_BACKUP_DIR_PROBLEM="this folder is nested inside your real folder - it needs to be a separate, sibling folder instead"
+      fi
+    fi
+    if [[ "$REAL_BACKUP_DIR_OK" == true ]]; then
+      check "your backup exists as its own separate folder, at $REAL_BACKUP" pass
+    else
+      check "your backup exists as its own separate folder, at $REAL_BACKUP ($REAL_BACKUP_DIR_PROBLEM)" fail
+    fi
+
     # Everything below depends on being able to compute checksums at all.
     # Guard it as one block: with no checksum tool, computing "NO_CHECKSUM_TOOL"
     # on both sides of a comparison would otherwise silently "match" and
@@ -2176,9 +2228,11 @@ case "$MODULE" in
     if [[ "$CHECKSUM_TOOL_AVAILABLE" == false ]]; then
       check "before-manifest.txt exists, lists real files, and is timestamped by the checker (no checksum tool found on this system - contact the workshop)" fail
       check "after-manifest.txt exists, is non-empty, and is timestamped by the checker (no checksum tool found on this system - contact the workshop)" fail
+      check "index.txt exists as a genuinely new file from Part 5's directed task (no checksum tool found on this system - contact the workshop)" fail
       check "before-manifest.txt was recorded before after-manifest.txt (no checksum tool found on this system - contact the workshop)" fail
       check "backup/ exists and contains exactly the files listed in your before-manifest (no checksum tool found on this system - contact the workshop)" fail
       check "every file in backup/ is byte-identical to the original (checked by checksum, recorded when before-manifest.txt was first pinned) (no checksum tool found on this system - contact the workshop)" fail
+      check "every original file still matches its recorded fingerprint (no checksum tool found on this system - contact the workshop)" fail
       BEFORE_OK=false
     else
 
@@ -2289,44 +2343,82 @@ case "$MODULE" in
       check "after-manifest.txt exists, is non-empty, and is timestamped by the checker ($AFTER_PROBLEM)" fail
     fi
 
-    # 4b. At least one genuinely new file exists in the real folder, present
-    #    in after-manifest.txt but not in before-manifest.txt -- real,
-    #    non-empty evidence that Part 5's directed task actually produced
-    #    something, not just that two manifests exist and are in order.
-    #    Found by a fresh-context adversarial pass: without this check,
-    #    `ls` run twice back to back with no Claude Code session ever
-    #    launched -- no new file, no permission prompt, nothing -- produced
-    #    a full RESULT: PASS (9/9). This module's entire reason to exist is
-    #    the directed real-file task; this check is what actually requires
-    #    it happened, even though it still can't prove Claude Code (rather
-    #    than the learner by hand) produced the new file's content -- the
-    #    same provenance limit every module's checks already carry.
-    NEW_FILE_OK=false
-    NEW_FILE_PROBLEM="can't check for new work until both manifests are properly recorded (see above)"
+    # 4b. index.txt specifically -- new since before-manifest.txt, non-empty,
+    #    a real file -- exists in the real folder. Originally this checked
+    #    for "any new file," found by a fresh-context adversarial pass to
+    #    produce a full RESULT: PASS with no Claude Code session ever
+    #    launched (`ls` run twice with nothing between them). Tightening to
+    #    "any new file" still wasn't enough: this workshop's own Mock
+    #    Learner Gremlin sweep (2026-09-16) found, independently, twice, that
+    #    the module's own OPTIONAL Part 5 CLAUDE.md file -- written entirely
+    #    by hand, no Claude Code involvement at all -- also satisfied "any
+    #    new file." Naming the specific required artifact closes both: a
+    #    hand-written CLAUDE.md no longer counts, since it isn't index.txt.
+    #    This still can't prove Claude Code (rather than the learner, by
+    #    hand) produced index.txt's content -- the same provenance limit
+    #    every module's checks already carry, named plainly in this
+    #    module's own README rather than overstated here.
+    INDEX_FILE_OK=false
+    INDEX_FILE_PROBLEM="can't check for new work until both manifests are properly recorded (see above)"
     if [[ "$BEFORE_OK" == true && "$AFTER_OK" == true && "$REAL_FOLDER_OK" == true ]]; then
       BEFORE_NAMES="$(parse_manifest_names "$BEFORE_MANIFEST" "$REAL_FOLDER")"
-      AFTER_NAMES="$(parse_manifest_names "$AFTER_MANIFEST" "$REAL_FOLDER")"
-      NEW_FILE_PROBLEM="after-manifest.txt lists no file that wasn't already in before-manifest.txt - do Part 5's task for real, then re-run ls"
-      while IFS= read -r nm; do
-        [[ -z "$nm" ]] && continue
-        if ! printf '%s\n' "$BEFORE_NAMES" | grep -Fxq "$nm"; then
-          npath="$REAL_FOLDER/$nm"
-          if [[ -L "$npath" ]]; then
-            NEW_FILE_PROBLEM="$nm is new but is a symlink, not a real file"
-            continue
-          fi
-          if [[ -f "$npath" && -s "$npath" ]]; then
-            NEW_FILE_OK=true
-            NEW_FILE_PROBLEM=""
-            break
-          fi
+      INDEX_PATH="$REAL_FOLDER/index.txt"
+      if printf '%s\n' "$BEFORE_NAMES" | grep -Fxq "index.txt"; then
+        INDEX_FILE_PROBLEM="index.txt already existed before Part 5 - if you're redoing this module, remove it and re-copy your before-manifest first"
+      elif [[ -L "$INDEX_PATH" ]]; then
+        INDEX_FILE_PROBLEM="index.txt is a symlink, not a real file"
+      elif [[ -f "$INDEX_PATH" && -s "$INDEX_PATH" ]]; then
+        INDEX_LINK_COUNT="$(stat -f '%l' "$INDEX_PATH" 2>/dev/null || stat -c '%h' "$INDEX_PATH" 2>/dev/null || echo "1")"
+        if [[ "$INDEX_LINK_COUNT" != "1" ]]; then
+          INDEX_FILE_PROBLEM="index.txt is a hard link, not an independently-written file"
+        else
+          INDEX_FILE_OK=true
+          INDEX_FILE_PROBLEM=""
         fi
-      done <<< "$AFTER_NAMES"
+      else
+        INDEX_FILE_PROBLEM="index.txt not found yet in your real folder - do Part 5's task for real, then re-run ls for your after-manifest"
+      fi
     fi
-    if [[ "$NEW_FILE_OK" == true ]]; then
-      check "at least one new, non-empty file exists from Part 5's directed task" pass
+    if [[ "$INDEX_FILE_OK" == true ]]; then
+      check "index.txt exists as a genuinely new file from Part 5's directed task" pass
     else
-      check "at least one new, non-empty file exists from Part 5's directed task ($NEW_FILE_PROBLEM)" fail
+      check "index.txt exists as a genuinely new file from Part 5's directed task ($INDEX_FILE_PROBLEM)" fail
+    fi
+
+    # 4c. Every original file still matches the fingerprint recorded when
+    #    before-manifest.txt was first pinned -- catches a silent in-place
+    #    edit to an existing file's CONTENT, which a filename-only `ls`
+    #    comparison structurally cannot see. Scoped to this module's own
+    #    task (Part 5 explicitly asks for something "strictly additive"),
+    #    not a universal claim that real files may never change -- this
+    #    module's own README says so plainly. Found as a real gap by this
+    #    workshop's own Workshop Review Panel (Security-Conscious Reviewer
+    #    persona, 2026-09-16): the previously-taught verify step (`ls`) could
+    #    not detect this class of change at all.
+    INTEGRITY_OK=false
+    INTEGRITY_PROBLEM="can't check file integrity until before-manifest.txt is properly pinned (see above)"
+    if [[ "$BEFORE_OK" == true ]]; then
+      INTEGRITY_OK=true
+      INTEGRITY_PROBLEM=""
+      while IFS=$'\t' read -r tag oname osum; do
+        [[ "$tag" == "ORIGINAL" ]] || continue
+        ofile="$REAL_FOLDER/$oname"
+        if [[ -L "$ofile" ]]; then
+          INTEGRITY_OK=false; INTEGRITY_PROBLEM="$oname is now a symlink, not the original file"; continue
+        fi
+        if [[ ! -f "$ofile" ]]; then
+          INTEGRITY_OK=false; INTEGRITY_PROBLEM="$oname is missing from your real folder"; continue
+        fi
+        current_sum="$(file_checksum "$ofile" 2>/dev/null || echo "")"
+        if [[ -z "$current_sum" || "$current_sum" != "$osum" ]]; then
+          INTEGRITY_OK=false; INTEGRITY_PROBLEM="$oname no longer matches its recorded fingerprint - its content changed since Part 4"
+        fi
+      done < "$PIN_FILE"
+    fi
+    if [[ "$INTEGRITY_OK" == true ]]; then
+      check "every original file still matches its recorded fingerprint" pass
+    else
+      check "every original file still matches its recorded fingerprint ($INTEGRITY_PROBLEM)" fail
     fi
 
     # 5. Chronological order: before-manifest's stamp must be no later than
