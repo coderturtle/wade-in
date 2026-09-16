@@ -86,7 +86,9 @@ deployment:
   human_confirmed: true
   protected_domain_state: verified
   https_enforced: false
-  site_content_live: false
+  site_content_live: true
+  first_deploy_run: "https://github.com/coderturtle/wade-in/actions/runs/35146803274"
+  first_deploy_date: 2026-09-16
   # Onboarded as the eighth github-pages-dns consumer, agentic-infra-lab PR #15
   # (dermdunc/agentic-infra-lab). Repo-side: Pages enabled (build_type:
   # workflow) and custom domain set via `gh api POST` then `PUT
@@ -97,12 +99,19 @@ deployment:
   # GitHub's account-level "Add a domain" step) - confirmed via dig against
   # two independent resolvers, and protected_domain_state confirmed
   # "verified" via `gh api repos/coderturtle/wade-in/pages` directly, not
-  # inferred from pending_domain_unverified_at being null. https_enforced is
-  # false; GitHub may flip this automatically once a certificate issues, or
-  # it may need a manual toggle - not yet checked. site_content_live is
-  # false: no workflow_dispatch deploy has run yet.
+  # inferred from pending_domain_unverified_at being null.
   #
-  # Still open: (1) first real `workflow_dispatch` deploy, confirm live at
-  # the custom domain; (2) uncomment deploy-pages.yml's `push` trigger for
-  # auto-publish going forward.
+  # First real deploy triggered 2026-09-16 (workflow_dispatch, after merging
+  # #16 module content and #17 this deployment metadata to main). Run
+  # succeeded; confirmed live for real, not just trusted from run status -
+  # `curl -L http://wade-in.coderturtle.io/` returns 200. https_enforced is
+  # still false as of this check; GitHub's Let's Encrypt cert issuance is
+  # asynchronous (minutes to ~an hour after the CNAME resolves) and a direct
+  # HTTPS TLS handshake against the custom domain was still hanging at this
+  # check, consistent with that - recheck https_enforced later, don't assume
+  # it flipped.
+  #
+  # Still open: uncomment deploy-pages.yml's `push` trigger for subsequent
+  # auto-publish, once the maintainer is ready to stop hand-triggering
+  # deploys.
 
