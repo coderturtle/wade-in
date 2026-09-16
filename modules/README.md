@@ -5,9 +5,9 @@ Wade In's arc takes a learner who has never opened a terminal through ten module
 **Hands-on by design, not passive text.** No module here completes by reading it. Every module states a required gate before content exists: an artifact you produce, checked two ways. Every module also has a stated **takeaway**: something reusable you're meant to keep, not just proof you did the exercise. Named honestly: most modules' checked artifact and its takeaway are currently two separate things (the checked work is one file, the reusable pack piece is another) rather than the gate directly producing the takeaway - closing that gap for real is still an open design decision, not solved yet.
 
 > **Content status: all ten modules have real, authored content, fixtures, and a working
-> checker script**, each with a fresh-context same-model DDD review; Modules 01, 02, and 10 also
-> had a cross-model Codex pass. None of it is merged to `main` yet - see `docs/next-actions.md`
-> for what happens next.
+> checker script**, each with a fresh-context same-model review; Modules 01, 02, and 10 also had
+> a cross-model review pass, and every module has been tried blind, end to end, by a simulated
+> learner before shipping. See `docs/next-actions.md` for what happens next.
 
 ## The gate, in plain terms
 
