@@ -125,6 +125,7 @@ EXPECTED_WELCOME_NOTE_SHA256="f9f6b278a9732f0dbcc0969414f34d7365942ce8e8aea70577
 EXPECTED_VENUE_HISTORY_SHA256="3afe8aea8f84e6fff4da67c0f48d14b7956c6630ff06756c2ea2bb6180eec7a5"
 EXPECTED_STAFF_LIST_SHA256="f7e6af0c87228e99d6d880b0b4b10bc1cda45e708f03235eaa2fcd973be9243f"
 EXPECTED_EMMETT_MEMO_SHA256="7abfa8b6da208141a046ac44fc903e56d4692cd4d190b9660ed3d2526a9fb5d3"
+EXPECTED_MONTHLY_RAW_NUMBERS_SHA256="9268dbb4a3b65e437b159a082ee51eeb7d70bd24365bdbca6004a24206aea255"
 
 # Module 04's 12 door-count fixtures, one embedded sha256 per date. A `case`
 # statement, not `declare -A` -- see the Module 01/02 comment below on why:
@@ -1101,6 +1102,199 @@ case "$MODULE" in
       fi
     else
       check "05-research/answers.txt has all three reflection answers, in your own words" fail
+    fi
+    ;;
+  06)
+    # 1. 06-docs/ itself is a real directory, not a symlink standing in for
+    #    one -- same convention as Module 02's 02-meet/ check.
+    EXPECTED_06_DOCS="$ROOT/06-docs"
+    DOCS_DIR_OK=true
+    if [[ -e "$EXPECTED_06_DOCS" ]]; then
+      REAL_06_DOCS="$(cd "$EXPECTED_06_DOCS" 2>/dev/null && pwd -P || echo "")"
+      if [[ "$REAL_06_DOCS" != "$EXPECTED_06_DOCS" ]]; then
+        DOCS_DIR_OK=false
+      fi
+    fi
+
+    # 2. 06-docs/monthly-summary.md exists for real -- not a symlink, and not
+    #    a hard link either (checked via link count, same reasoning as
+    #    Module 02's summary.txt check: this file is learner/Claude-Code-
+    #    authored, not copied from a fixture, so a freshly written file never
+    #    shares an inode with anything else).
+    DOC="$ROOT/06-docs/monthly-summary.md"
+    DOC_LINK_COUNT="$(stat -f '%l' "$DOC" 2>/dev/null || stat -c '%h' "$DOC" 2>/dev/null || echo "1")"
+    if [[ "$DOCS_DIR_OK" == false ]]; then
+      check "06-docs/monthly-summary.md exists and is non-empty (06-docs/ is a symlink, not a real directory)" fail
+    elif [[ -L "$DOC" ]]; then
+      check "06-docs/monthly-summary.md exists and is non-empty (found a symlink, not a real file)" fail
+    elif [[ -f "$DOC" && "$DOC_LINK_COUNT" != "1" ]]; then
+      check "06-docs/monthly-summary.md exists and is non-empty (found a hard link, not an independently-written file)" fail
+    elif [[ -s "$DOC" ]]; then
+      check "06-docs/monthly-summary.md exists and is non-empty" pass
+    else
+      check "06-docs/monthly-summary.md exists and is non-empty" fail
+    fi
+    DOC_REAL_FILE=false
+    [[ "$DOCS_DIR_OK" == true && -f "$DOC" && ! -L "$DOC" && "$DOC_LINK_COUNT" == "1" && -s "$DOC" ]] && DOC_REAL_FILE=true
+
+    # 3. Word count within the stated bounds (150-400 words), counted the
+    #    same plain way `wc -w` counts -- whitespace-separated tokens across
+    #    the whole file, headers included, matching what the module page
+    #    tells the learner to aim for.
+    if [[ "$DOC_REAL_FILE" == true ]]; then
+      WORD_COUNT="$(wc -w < "$DOC" 2>/dev/null | tr -d '[:space:]')"
+      if [[ "$WORD_COUNT" =~ ^[0-9]+$ ]] && [[ "$WORD_COUNT" -ge 150 && "$WORD_COUNT" -le 400 ]]; then
+        check "monthly-summary.md is 150-400 words long (found $WORD_COUNT)" pass
+      else
+        check "monthly-summary.md is 150-400 words long (found ${WORD_COUNT:-0})" fail
+      fi
+    else
+      check "monthly-summary.md is 150-400 words long" fail
+    fi
+
+    # 4-7. The monthly total (recomputed by THIS SCRIPT as the sum of the
+    #    fixture's four weekly figures -- never an embedded key, so the
+    #    check stays correct if the fixture's own figures ever change) and
+    #    three further figures (bar tab total, door revenue total, events
+    #    held), all read directly from the fixture. The fixture is checksum-
+    #    verified first -- same defense as Modules 01 and 02's own fixtures:
+    #    a tampered fixture (e.g. edited to inflate a weekly figure) must not
+    #    let the checker faithfully "verify" a summary against the tampered
+    #    value instead of the real one.
+    #    Figure matching extracts every run of digits (with an optional
+    #    leading `$` and optional interior commas, both stripped before
+    #    comparing) from the document and requires an EXACT match against
+    #    the canonical digit string -- not a substring match, which (per
+    #    Module 02's own documented bug) would let a longer nearby figure
+    #    like "$127,845" wrongly appear to contain "$27,845".
+    RAW_NUMBERS_FIXTURE="$ROOT/fixtures/monthly-raw-numbers.txt"
+    RAW_NUMBERS_SUM="$(file_checksum "$RAW_NUMBERS_FIXTURE" 2>/dev/null || echo "MISSING_FIXTURE")"
+    if [[ "$RAW_NUMBERS_SUM" != "$EXPECTED_MONTHLY_RAW_NUMBERS_SHA256" ]]; then
+      check "monthly-summary.md includes the exact monthly total (workshop fixture doesn't match its expected content - contact the workshop, not your own mistake)" fail
+      check "monthly-summary.md includes the bar tab total (workshop fixture doesn't match its expected content - contact the workshop, not your own mistake)" fail
+      check "monthly-summary.md includes the door revenue total (workshop fixture doesn't match its expected content - contact the workshop, not your own mistake)" fail
+      check "monthly-summary.md includes the number of events held (workshop fixture doesn't match its expected content - contact the workshop, not your own mistake)" fail
+    else
+      WEEK_1="$(grep -oE 'Week 1 revenue: \$[0-9,]+' "$RAW_NUMBERS_FIXTURE" 2>/dev/null | grep -oE '[0-9,]+$' | tr -d ',')"
+      WEEK_2="$(grep -oE 'Week 2 revenue: \$[0-9,]+' "$RAW_NUMBERS_FIXTURE" 2>/dev/null | grep -oE '[0-9,]+$' | tr -d ',')"
+      WEEK_3="$(grep -oE 'Week 3 revenue: \$[0-9,]+' "$RAW_NUMBERS_FIXTURE" 2>/dev/null | grep -oE '[0-9,]+$' | tr -d ',')"
+      WEEK_4="$(grep -oE 'Week 4 revenue: \$[0-9,]+' "$RAW_NUMBERS_FIXTURE" 2>/dev/null | grep -oE '[0-9,]+$' | tr -d ',')"
+      BAR_TOTAL="$(grep -oE 'Bar tab total for the month: \$[0-9,]+' "$RAW_NUMBERS_FIXTURE" 2>/dev/null | grep -oE '[0-9,]+$' | tr -d ',')"
+      DOOR_TOTAL="$(grep -oE 'Door revenue total for the month: \$[0-9,]+' "$RAW_NUMBERS_FIXTURE" 2>/dev/null | grep -oE '[0-9,]+$' | tr -d ',')"
+      EVENTS_HELD="$(grep -oE 'Events held this month: [0-9]+' "$RAW_NUMBERS_FIXTURE" 2>/dev/null | grep -oE '[0-9]+$')"
+      if [[ -z "$WEEK_1" || -z "$WEEK_2" || -z "$WEEK_3" || -z "$WEEK_4" || -z "$BAR_TOTAL" || -z "$DOOR_TOTAL" || -z "$EVENTS_HELD" ]]; then
+        check "monthly-summary.md includes the exact monthly total (couldn't read the raw figures from the workshop fixture - contact the workshop)" fail
+        check "monthly-summary.md includes the bar tab total (couldn't read it from the workshop fixture - contact the workshop)" fail
+        check "monthly-summary.md includes the door revenue total (couldn't read it from the workshop fixture - contact the workshop)" fail
+        check "monthly-summary.md includes the number of events held (couldn't read it from the workshop fixture - contact the workshop)" fail
+      else
+        MONTHLY_TOTAL=$((WEEK_1 + WEEK_2 + WEEK_3 + WEEK_4))
+        if [[ "$DOC_REAL_FILE" == true ]]; then
+          DOC_NUMBER_TOKENS="$(grep -oE '\$?[0-9][0-9,]*' "$DOC" 2>/dev/null | tr -d '$,')"
+        else
+          DOC_NUMBER_TOKENS=""
+        fi
+        if [[ "$DOC_REAL_FILE" == true ]] && echo "$DOC_NUMBER_TOKENS" | grep -qxF "$MONTHLY_TOTAL"; then
+          check "monthly-summary.md includes the exact monthly total (\$$MONTHLY_TOTAL)" pass
+        else
+          check "monthly-summary.md includes the exact monthly total (\$$MONTHLY_TOTAL)" fail
+        fi
+        if [[ "$DOC_REAL_FILE" == true ]] && echo "$DOC_NUMBER_TOKENS" | grep -qxF "$BAR_TOTAL"; then
+          check "monthly-summary.md includes the bar tab total (\$$BAR_TOTAL)" pass
+        else
+          check "monthly-summary.md includes the bar tab total (\$$BAR_TOTAL)" fail
+        fi
+        if [[ "$DOC_REAL_FILE" == true ]] && echo "$DOC_NUMBER_TOKENS" | grep -qxF "$DOOR_TOTAL"; then
+          check "monthly-summary.md includes the door revenue total (\$$DOOR_TOTAL)" pass
+        else
+          check "monthly-summary.md includes the door revenue total (\$$DOOR_TOTAL)" fail
+        fi
+        # Events-held gets a stricter check than the three dollar totals: a
+        # small, common integer like this one collides constantly with
+        # unrelated numbers in ordinary prose (a date, "the 19th," a list
+        # count) -- found by a fresh-context adversarial pass, which built
+        # a real document that never states the events-held figure at all
+        # but happened to mention "the 19th" elsewhere, and passed anyway.
+        # Requiring the number to appear on the same LINE as the word
+        # "event" (case-insensitive) is a real, meaningful tightening, not
+        # a complete fix -- a line that mentions "event" AND some other
+        # unrelated number would still false-accept -- but it closes the
+        # specific, demonstrated false pass and is a named, accepted limit
+        # rather than a claim of full semantic verification.
+        if [[ "$DOC_REAL_FILE" == true ]]; then
+          EVENT_LINE_TOKENS="$(grep -iE 'event' "$DOC" 2>/dev/null | grep -oE '\$?[0-9][0-9,]*' | tr -d '$,')"
+        else
+          EVENT_LINE_TOKENS=""
+        fi
+        if [[ "$DOC_REAL_FILE" == true ]] && echo "$EVENT_LINE_TOKENS" | grep -qxF "$EVENTS_HELD"; then
+          check "monthly-summary.md includes the number of events held ($EVENTS_HELD)" pass
+        else
+          check "monthly-summary.md includes the number of events held ($EVENTS_HELD)" fail
+        fi
+      fi
+    fi
+
+    # 8. All 5 required section headers present verbatim -- a closed set,
+    #    each checked as an exact whole-line match (not a substring, so a
+    #    header buried mid-sentence or missing its own line doesn't count).
+    #    A plain indexed array, not `declare -A` -- see the standing note on
+    #    Modules 01/02's identical discipline, above: stock macOS bash 3.2
+    #    has no associative arrays, but ordinary indexed arrays work fine.
+    REQUIRED_HEADERS=("## Summary" "## Revenue Breakdown" "## Notable Items" "## Comparison to Prior Month" "## Prepared By")
+    MISSING_HEADERS=()
+    if [[ "$DOC_REAL_FILE" == true ]]; then
+      for header in "${REQUIRED_HEADERS[@]}"; do
+        if ! grep -qxF "$header" "$DOC" 2>/dev/null; then
+          MISSING_HEADERS+=("$header")
+        fi
+      done
+    else
+      MISSING_HEADERS=("${REQUIRED_HEADERS[@]}")
+    fi
+    if [[ "${#MISSING_HEADERS[@]}" -eq 0 ]]; then
+      check "monthly-summary.md has all 5 required section headers, written exactly as specified" pass
+    else
+      check "monthly-summary.md has all 5 required section headers, written exactly as specified (still missing: ${MISSING_HEADERS[*]})" fail
+    fi
+
+    # 9. Own-words answers file: same discipline as every module before this
+    #    one -- presence-checked for genuine content, rejecting the literal
+    #    placeholder text from the module page itself, and rejecting a
+    #    symlink or hard link standing in for a real file.
+    ANSWERS06="$ROOT/06-docs/answers.txt"
+    ANSWERS06_LINK_COUNT="$(stat -f '%l' "$ANSWERS06" 2>/dev/null || stat -c '%h' "$ANSWERS06" 2>/dev/null || echo "1")"
+    PLACEHOLDER_READS06="<does the document read like something you'd hand an accountant, or like your own working notes with headers added - and what would you change?>"
+    PLACEHOLDER_VERIFIED06="<specifically, how did you check the figures yourself before trusting the draft?>"
+    PLACEHOLDER_NOTICES06="<in your own words, what's the actual risk if one figure in a document like this is wrong?>"
+    if [[ "$DOCS_DIR_OK" == false ]]; then
+      check "06-docs/answers.txt has all three reflection answers, in your own words (06-docs/ is a symlink, not a real directory)" fail
+    elif [[ -L "$ANSWERS06" ]]; then
+      check "06-docs/answers.txt has all three reflection answers, in your own words (found a symlink, not a real file)" fail
+    elif [[ -f "$ANSWERS06" && "$ANSWERS06_LINK_COUNT" != "1" ]]; then
+      check "06-docs/answers.txt has all three reflection answers, in your own words (found a hard link, not an independently-written file)" fail
+    elif [[ -f "$ANSWERS06" ]]; then
+      MISSING_LABELS=()
+      # Bash-3.2-safe case statement, not an associative array -- see the
+      # matching comment on Modules 01/02's identical pattern, above.
+      for label in "READS_LIKE_A_SUMMARY:" "VERIFIED_HOW:" "WHAT_CARL_NOTICES:"; do
+        case "$label" in
+          "READS_LIKE_A_SUMMARY:") EXPECTED_PLACEHOLDER="$PLACEHOLDER_READS06" ;;
+          "VERIFIED_HOW:") EXPECTED_PLACEHOLDER="$PLACEHOLDER_VERIFIED06" ;;
+          "WHAT_CARL_NOTICES:") EXPECTED_PLACEHOLDER="$PLACEHOLDER_NOTICES06" ;;
+        esac
+        LINE="$(grep -m1 "^$label" "$ANSWERS06" 2>/dev/null || true)"
+        VALUE="$(echo "$LINE" | sed "s/^$label//" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+        if [[ -z "$VALUE" || "$VALUE" == "$EXPECTED_PLACEHOLDER" ]]; then
+          MISSING_LABELS+=("$label")
+        fi
+      done
+      if [[ "${#MISSING_LABELS[@]}" -eq 0 ]]; then
+        check "06-docs/answers.txt has all three reflection answers, in your own words" pass
+      else
+        check "06-docs/answers.txt has all three reflection answers, in your own words (still needed: ${MISSING_LABELS[*]})" fail
+      fi
+    else
+      check "06-docs/answers.txt has all three reflection answers, in your own words" fail
     fi
     ;;
   *)
