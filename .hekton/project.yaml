@@ -70,3 +70,18 @@ architecture:
 notes:
   - Teach non-technical knowledge workers, who have never used a terminal, to get real research/document/spreadsheet-adjacent/light-automation work done with Claude Code itself, gated by a deterministic checker script plus an AI-graded rubric, inside one continuing named scenario.
 
+deployment:
+  pattern: github-pages-dns
+  subdomain_fqdn: wade-in.coderturtle.io
+  root_domain: coderturtle.io
+  pages_host: coderturtle.github.io
+  repo: coderturtle/wade-in
+  create_domain_verification: true
+  # Onboarded as the eighth github-pages-dns consumer, agentic-infra-lab PR #15
+  # (dermdunc/agentic-infra-lab), 2026-09-16. terraform plan is GREEN (1 create,
+  # CNAME only) and awaiting human `terraform apply` — not yet applied. The
+  # TXT domain-verification record and the human_confirmed/applied_date/
+  # pages_enabled/etc. fields (matching copilot-fluent's own recorded shape)
+  # get filled in after that apply and the GitHub-side steps are confirmed,
+  # not before.
+
