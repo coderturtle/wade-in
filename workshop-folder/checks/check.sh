@@ -193,7 +193,7 @@ EXPECTED_OPENING_NIGHT_FIGURES_SHA256="908c7f3f8eaa510bb7a47b22dd825e19718440d00
 EXPECTED_PENNY_GUEST_LIST_SHA256="cf36c74f98c4c4f07524bad48a14daf5893414511b954d44d537ab9808ada681"
 EXPECTED_TILGHMAN_GUEST_DRAFT_SHA256="43ea496e872fdabe71b10233c00c1739496aa3a27332a8d108582c85a1a80470"
 EXPECTED_PRESS_PHOTO_MAPPING_SHA256="445691e5c2f886eafd54460e4e763fc56ea1c9f6d18913e64ec03c2a7e2832d2"
-EXPECTED_PRESS_PHOTOS_AGG_SHA256="c5139d7096006fbf18cf722406ab9bc0b4c1b6dd8fe3c0ebc0d3b81a10b5bffe"
+EXPECTED_PRESS_PHOTOS_AGG_SHA256="98d8ffb97af18290d673c36ba1f2d85c98bc7596a928db978b7150c2e6157a60"
 EXPECTED_VIP_CONFIRMATIONS_SHA256="86b330903692c522af546bbed0ccd09f841523dacc66e9f1ccad4b1cf0189b2d"
 
 # --- Module 09 helper functions --------------------------------------------
@@ -1013,7 +1013,17 @@ case "$MODULE" in
         | sed -E 's#^https?://##' \
         | sed -E 's/\.$//' \
         | tr '[:upper:]' '[:lower:]' \
-        | awk -F'.' '{if (NF>=2) print $(NF-1)"."$NF; else print $0}' \
+        | awk -F'.' '{
+            n=NF
+            if (n>=3) {
+              last2=$(n-1)"."$n
+              if (last2=="co.uk" || last2=="org.uk" || last2=="ac.uk" || last2=="gov.uk" || last2=="com.au" || last2=="net.au" || last2=="org.au" || last2=="co.nz" || last2=="co.jp" || last2=="co.in" || last2=="co.za" || last2=="com.br" || last2=="com.mx") {
+                print $(n-2)"."$(n-1)"."$n
+                next
+              }
+            }
+            if (n>=2) print $(n-1)"."$n; else print $0
+          }' \
         | sort -u)"
       HOSTNAME10_COUNT="$(printf '%s\n' "$HOSTNAMES10" | grep -c '.' || true)"
       if [[ "$HOSTNAME10_COUNT" -ge 3 ]]; then
@@ -1089,6 +1099,8 @@ case "$MODULE" in
         [[ -e "$f" ]] || continue
         BASE_NAME="$(basename "$f")"
         if [[ "$BASE_NAME" != "crew-report.txt" && "$BASE_NAME" != "answers.txt" && -f "$f" && ! -L "$f" && -s "$f" ]]; then
+          F_LINK_COUNT="$(stat -f '%l' "$f" 2>/dev/null || stat -c '%h' "$f" 2>/dev/null || echo "1")"
+          [[ "$F_LINK_COUNT" != "1" ]] && continue
           CREW_SCRIPT_FOUND=true
           break
         fi
@@ -1178,7 +1190,10 @@ case "$MODULE" in
     fi
 
     ANSWERS10_CREW="$ROOT/10-capstone/crew/answers.txt"
+    ANSWERS10_CREW_LINK_COUNT="$(stat -f '%l' "$ANSWERS10_CREW" 2>/dev/null || stat -c '%h' "$ANSWERS10_CREW" 2>/dev/null || echo "1")"
     if [[ -L "$ANSWERS10_CREW" ]]; then
+      check "10-capstone/crew/answers.txt has a genuine reflection answer" fail
+    elif [[ -f "$ANSWERS10_CREW" && "$ANSWERS10_CREW_LINK_COUNT" != "1" ]]; then
       check "10-capstone/crew/answers.txt has a genuine reflection answer" fail
     elif [[ -f "$ANSWERS10_CREW" ]]; then
       LINE="$(grep -m1 "^PLAN_FIRST:" "$ANSWERS10_CREW" 2>/dev/null || true)"
@@ -1378,9 +1393,9 @@ case "$MODULE" in
     GUEST_ACTUAL_COUNT="${#GUEST_ACTUAL_IDS[@]}"
 
     if [[ "$GUEST_FIXTURES_OK" == true && "$GUEST_LEARNER_FILE_OK" == true && "$GUEST_ACTUAL_COUNT" -eq "$GUEST_EXPECTED_COUNT" ]]; then
-      check "guest-list-clean.csv row count matches the recomputed post-dedup count ($GUEST_EXPECTED_COUNT)" pass
+      check "guest-list-clean.csv row count matches the recomputed post-dedup count" pass
     else
-      check "guest-list-clean.csv row count matches the recomputed post-dedup count ($GUEST_EXPECTED_COUNT, found $GUEST_ACTUAL_COUNT)" fail
+      check "guest-list-clean.csv row count matches the recomputed post-dedup count" fail
     fi
 
     GUEST_ID_SET_OK=true
@@ -1465,7 +1480,7 @@ case "$MODULE" in
       check "fixtures/capstone/press-photo-mapping.csv matches its expected content" pass
     fi
 
-    PRESS_PHOTOS_AGG_SUM="$(for i in $(seq -w 1 20); do cat "$ROOT/fixtures/capstone/press-photos/PRESS_$i.jpg" 2>/dev/null; done | file_checksum /dev/stdin 2>/dev/null || echo "MISSING_FIXTURE")"
+    PRESS_PHOTOS_AGG_SUM="$(for i in $(seq -w 1 20); do f="$ROOT/fixtures/capstone/press-photos/PRESS_$i.jpg"; sz="$(wc -c < "$f" 2>/dev/null | tr -d ' ')"; sum="$(file_checksum "$f" 2>/dev/null)"; printf 'PRESS_%s.jpg %s %s\n' "$i" "$sz" "$sum"; done | file_checksum /dev/stdin 2>/dev/null || echo "MISSING_FIXTURE")"
     PRESS_PHOTOS_FIXTURE_OK=true
     if [[ "$PRESS_PHOTOS_AGG_SUM" != "$EXPECTED_PRESS_PHOTOS_AGG_SHA256" ]]; then
       PRESS_PHOTOS_FIXTURE_OK=false
@@ -1589,7 +1604,7 @@ case "$MODULE" in
           fi
           [[ "$ALREADY_CLAIMED" == true ]] && continue
           CANDIDATE="${VIP_LETTER_FILES[$idx]}"
-          if grep -qF "$v_name" "$CANDIDATE" 2>/dev/null && grep -qF "$v_date" "$CANDIDATE" 2>/dev/null && grep -qF "$v_party" "$CANDIDATE" 2>/dev/null; then
+          if grep -qF "$v_name" "$CANDIDATE" 2>/dev/null && grep -qF "$v_date" "$CANDIDATE" 2>/dev/null && grep -qE "(^|[^0-9])${v_party}([^0-9]|\$)" "$CANDIDATE" 2>/dev/null; then
             ROW_MATCHED=true
             VIP_CLAIMED+=("$idx")
             break
@@ -1637,11 +1652,13 @@ case "$MODULE" in
       for CANDIDATE in "${VIP_LETTER_FILES[@]}"; do
         C="$(grep -o '{' "$CANDIDATE" 2>/dev/null | wc -l | tr -d ' ')"
         VIP_PLACEHOLDER_COUNT=$((VIP_PLACEHOLDER_COUNT + C))
+        C2="$(grep -oE '\[[A-Za-z_]+\]|<[A-Za-z_]+>|[A-Za-z_]+_HERE' "$CANDIDATE" 2>/dev/null | wc -l | tr -d ' ')"
+        VIP_PLACEHOLDER_COUNT=$((VIP_PLACEHOLDER_COUNT + C2))
       done
       if [[ "$VIP_PLACEHOLDER_COUNT" -eq 0 ]]; then
-        check "zero unfilled template placeholders across the VIP letters (no leftover { anywhere)" pass
+        check "zero unfilled template placeholders across the VIP letters (no leftover {, [BRACKETED], <TAGGED>, or _HERE markers)" pass
       else
-        check "zero unfilled template placeholders across the VIP letters (found $VIP_PLACEHOLDER_COUNT leftover { character(s))" fail
+        check "zero unfilled template placeholders across the VIP letters (found $VIP_PLACEHOLDER_COUNT leftover placeholder marker(s))" fail
       fi
     else
       check "zero unfilled template placeholders across the VIP letters (no letter files found to check)" fail
@@ -1687,8 +1704,9 @@ case "$MODULE" in
     done
 
     ROOT_CLAUDE_MD="$ROOT/CLAUDE.md"
+    ROOT_CLAUDE_MD_LINK_COUNT="$(stat -f '%l' "$ROOT_CLAUDE_MD" 2>/dev/null || stat -c '%h' "$ROOT_CLAUDE_MD" 2>/dev/null || echo "1")"
     ROOT_CLAUDE_MD_OK=false
-    if [[ -f "$ROOT_CLAUDE_MD" && ! -L "$ROOT_CLAUDE_MD" ]]; then
+    if [[ -f "$ROOT_CLAUDE_MD" && ! -L "$ROOT_CLAUDE_MD" && "$ROOT_CLAUDE_MD_LINK_COUNT" == "1" ]]; then
       if grep -Fxq '## Never touch `checks/`' "$ROOT_CLAUDE_MD" 2>/dev/null \
         && grep -Fxq '## Stay inside this folder unless a module says otherwise' "$ROOT_CLAUDE_MD" 2>/dev/null; then
         ROOT_CLAUDE_MD_OK=true
