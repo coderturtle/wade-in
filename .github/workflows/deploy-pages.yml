@@ -1,33 +1,30 @@
 name: Deploy site to GitHub Pages
 
-# Human Gate (per docs/next-actions.md and the Workshop Gremlin's own policy):
-# first Pages deploy is a human-confirmed action, not automatic. This workflow is
-# defined but NOT wired to run on push yet - only workflow_dispatch, so merging
-# this scaffold to main cannot itself trigger a live deploy. Once a human enables
-# GitHub Pages in repo settings and runs workflow_dispatch once to confirm the
-# site is ready to be public, add a `push: branches: [main]` trigger scoped to
-# site/**, docs/build-log/**, modules/**, and this file.
+# Human Gate history (per docs/next-actions.md and the Workshop Gremlin's own
+# policy): the first Pages deploy was a human-confirmed, workflow_dispatch-only
+# action, not automatic - see .hekton/project.yaml's deployment block for the
+# full record (agentic-infra-lab PR #15, wade-in PRs #16-18). That gate is now
+# satisfied: Pages is enabled (source = GitHub Actions), the custom domain
+# wade-in.coderturtle.io is set, DNS resolves and is verified, and the first
+# real deploy (2026-09-16, run 35146803274) confirmed the site live. The
+# `push` trigger below was added at that point, not before.
 #
-# Custom-domain scaffolding (wade-in.coderturtle.io, agentic-infra-lab's
-# github-pages-dns pattern, matching every prior workshop site) landed in this
-# same commit - not the actual cutover, which also needs the repo
-# Settings > Pages domain setting and live DNS, neither done yet. Per
-# docs/workshop-design.md's own status line, deployment/DNS is deliberately
-# deferred until real module content exists.
-#
-# Do NOT rely on site/public/CNAME in the build artifact to set the custom
-# domain for an Actions-based Pages deploy (a lesson copilot-fluent's own
-# workflow comment carries forward, corrected there after cross-model
-# review). The domain must be set via the repo's Settings > Pages UI (or the
-# API). Before running workflow_dispatch for the first time, a human must:
-# (1) enable Pages in repo Settings with source = GitHub Actions -
-# actions/configure-pages defaults enablement to false and can't self-enable
-# with the default GITHUB_TOKEN; (2) set the custom domain in that same
-# settings page; (3) confirm DNS for wade-in.coderturtle.io actually
-# resolves. None of DNS/domain/enablement blocks the build step itself, only
-# whether the deployed site is reachable at the custom hostname afterward.
+# Custom domain: wade-in.coderturtle.io, via agentic-infra-lab's
+# github-pages-dns pattern (Route53 CNAME + TXT verification). Do NOT rely on
+# site/public/CNAME alone for an Actions-based deploy to (re-)set the custom
+# domain - a lesson copilot-fluent's own workflow comment carries forward,
+# corrected there after cross-model review. Pages enablement and the
+# custom-domain setting are one-time, human-authenticated-session steps in
+# repo Settings > Pages (GITHUB_TOKEN cannot do either); already done.
 on:
   workflow_dispatch: {}
+  push:
+    branches: [main]
+    paths:
+      - "site/**"
+      - "docs/build-log/**"
+      - "modules/**"
+      - ".github/workflows/deploy-pages.yml"
 
 permissions:
   contents: read
