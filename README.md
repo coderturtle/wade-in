@@ -4,7 +4,7 @@
 
 Wade In is a self-paced, public workshop being built to teach non-technical knowledge workers, who have never used a terminal, to use the real Claude Code CLI for research, document drafting, spreadsheet-adjacent tasks, and light file-based automation. The plan: every exercise will run inside a workshop-provided sandbox on your own machine, checked by a real deterministic script, with an AI-graded pass covering the judgment calls a mechanical check can't. That's the design this repo is building toward, not something you can try yet - see Status below.
 
-**Status:** Modules 01 and 02 have real, authored content and working checker scripts. Modules 03-10 are design and skeleton only. Not fully ready to start yet; watch this repo.
+**Status:** All ten modules have real, authored content and working checker scripts. Not fully ready to start yet - none of this content is merged to `main` yet, and it hasn't had a real human pilot. Watch this repo.
 
 ## The arc
 
@@ -12,7 +12,7 @@ Ten modules, starting from zero: a terminal-literacy module (what a command even
 
 ## Quick Start
 
-There's nothing to run yet - no module has real exercise content, and no downloadable workshop folder exists. Watch this repo's [build log](https://coderturtle.github.io/wade-in/build-log/) or the [modules index](modules/README.md) for progress.
+There's nothing to run yet on `main` - all ten modules' real content is authored on stacked, unmerged branches, and no downloadable workshop folder has shipped. Watch this repo's [build log](https://coderturtle.github.io/wade-in/build-log/) or the [modules index](modules/README.md) for progress.
 
 ## Build in public
 
