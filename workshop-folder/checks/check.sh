@@ -117,6 +117,51 @@ file_inode() {
   stat -f '%i' "$1" 2>/dev/null || stat -c '%i' "$1" 2>/dev/null || echo "NO_STAT_TOOL"
 }
 
+trim_field() {
+  # Strip leading/trailing whitespace from one CSV field value. Found by a
+  # fresh-context adversarial pass on Module 07: a semantically-correct
+  # merge, written with a space after each comma (`BK-101, Name, ...`
+  # instead of no-space CSV -- a plausible style if a script hand-writes
+  # the CSV as text), failed 3 of 8 checks with generic messages giving no
+  # hint the real cause was stray whitespace, not a merge error. Trimming
+  # each field before comparison treats "400" and " 400" as the same
+  # value, matching what a human would consider "the same," without
+  # weakening the exact-match check against any REAL content difference.
+  printf '%s' "$1" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'
+}
+
+array_index_of() {
+  # Bash-3.2-safe lookup: given a target value and a haystack passed as
+  # remaining args, print the matching index or "-1". This, plus a plain
+  # indexed array, is this script's stand-in for an associative array's key
+  # lookup -- `declare -A` is never used anywhere in this script (stock
+  # macOS bash 3.2 has no associative arrays at all and crashes hard on one,
+  # confirmed and fixed twice already; see the comment on Module 01's
+  # answers check below for the exact failure mode).
+  #
+  # Caller responsibility: expanding "${arr[@]}" for a genuinely
+  # zero-length array under this script's `set -u` trips a real bash
+  # bug present in versions before 4.4 ("unbound variable" on an empty
+  # array even though it was explicitly initialized with `arr=()`) -- stock
+  # bash 3.2 has this bug. Every call site below guards with
+  # `[[ "${#arr[@]}" -gt 0 ]]` before expanding an array into this
+  # function's arguments, rather than expanding an possibly-empty array
+  # directly.
+  local target="$1"
+  shift
+  local i=0
+  local v
+  for v in "$@"; do
+    if [[ "$v" == "$target" ]]; then
+      printf '%s\n' "$i"
+      return 0
+    fi
+    i=$((i + 1))
+  done
+  printf '%s\n' "-1"
+  return 1
+}
+
 # Embedded checksums: the real, known-good sha256 of each fixture as
 # authored, computed once and pinned here. Update this value deliberately
 # (and note why, in a commit message) any time a fixture's real content
@@ -126,6 +171,8 @@ EXPECTED_VENUE_HISTORY_SHA256="3afe8aea8f84e6fff4da67c0f48d14b7956c6630ff06756c2
 EXPECTED_STAFF_LIST_SHA256="f7e6af0c87228e99d6d880b0b4b10bc1cda45e708f03235eaa2fcd973be9243f"
 EXPECTED_EMMETT_MEMO_SHA256="7abfa8b6da208141a046ac44fc903e56d4692cd4d190b9660ed3d2526a9fb5d3"
 EXPECTED_MONTHLY_RAW_NUMBERS_SHA256="9268dbb4a3b65e437b159a082ee51eeb7d70bd24365bdbca6004a24206aea255"
+EXPECTED_PENNY_BOOKINGS_SHA256="a84d9f1d87635beee84c0cebb4543c5212c7b09bab9d52bf20d755f4bbd78c6d"
+EXPECTED_GARRETT_BOOKINGS_SHA256="4d1159c92e231829fd0b985028e268bfcc31d9cb3aa806c310e28a420dcc388d"
 
 # Module 04's 12 door-count fixtures, one embedded sha256 per date. A `case`
 # statement, not `declare -A` -- see the Module 01/02 comment below on why:
@@ -1295,6 +1342,321 @@ case "$MODULE" in
       fi
     else
       check "06-docs/answers.txt has all three reflection answers, in your own words" fail
+    fi
+    ;;
+  07)
+    # Module 07: Penny's Ledger. Merge two overlapping bookings CSVs under a
+    # stated rule -- Penny's copy is authoritative for any booking ID
+    # present in both files (she's the current owner; Garrett's copy is the
+    # stale one) -- add a total_due column, and prove nothing was lost or
+    # invented. Ground truth is recomputed from the two pristine fixtures at
+    # check time, never read from an embedded key, so this only passes if
+    # the merge was genuinely done. Same no-`declare -A` discipline as every
+    # case above: every lookup uses a plain indexed array plus
+    # `array_index_of` (defined near the top of this script), guarded
+    # against the empty-array `set -u` bug noted there.
+
+    PENNY_FIXTURE="$ROOT/fixtures/penny-bookings.csv"
+    GARRETT_FIXTURE="$ROOT/fixtures/garrett-bookings.csv"
+    OUTPUT_DIR="$ROOT/07-csv"
+    OUTPUT_FILE="$OUTPUT_DIR/bookings-clean.csv"
+    REQUIRED_HEADER="booking_id,name,event_date,deposit,balance,total_due"
+
+    # 1. Fixture integrity: both source CSVs match their pinned checksums.
+    #    Checked first so every downstream check can say plainly whether a
+    #    failure is the learner's or a corrupted/tampered fixture's -- the
+    #    same discipline as Module 01/02's fixture checks, applied to two
+    #    fixtures instead of one.
+    FIXTURES_OK=true
+    PENNY_SUM="$(file_checksum "$PENNY_FIXTURE" 2>/dev/null || echo "MISSING_FIXTURE")"
+    GARRETT_SUM="$(file_checksum "$GARRETT_FIXTURE" 2>/dev/null || echo "MISSING_FIXTURE")"
+    if [[ "$PENNY_SUM" != "$EXPECTED_PENNY_BOOKINGS_SHA256" || "$GARRETT_SUM" != "$EXPECTED_GARRETT_BOOKINGS_SHA256" ]]; then
+      FIXTURES_OK=false
+      check "workshop fixtures penny-bookings.csv and garrett-bookings.csv match their expected content (contact the workshop, not your own mistake)" fail
+    else
+      check "workshop fixtures penny-bookings.csv and garrett-bookings.csv match their expected content" pass
+    fi
+
+    # 2. 07-csv/ is a real directory (not a symlink standing in for one --
+    #    same bypass class as Module 02's 02-meet/ check, reproduced there
+    #    with a symlinked parent redirecting outside the sandbox) and
+    #    bookings-clean.csv is a real file inside it: not a symlink, and not
+    #    a hard link either (a freshly-merged file never shares an inode
+    #    with anything else on a first write).
+    OUTPUT_DIR_OK=true
+    if [[ -e "$OUTPUT_DIR" ]]; then
+      REAL_OUTPUT_DIR="$(cd "$OUTPUT_DIR" 2>/dev/null && pwd -P || echo "")"
+      if [[ "$REAL_OUTPUT_DIR" != "$OUTPUT_DIR" ]]; then
+        OUTPUT_DIR_OK=false
+      fi
+    else
+      OUTPUT_DIR_OK=false
+    fi
+    OUTPUT_LINK_COUNT="$(stat -f '%l' "$OUTPUT_FILE" 2>/dev/null || stat -c '%h' "$OUTPUT_FILE" 2>/dev/null || echo "1")"
+    LEARNER_FILE_OK=false
+    if [[ "$OUTPUT_DIR_OK" == false ]]; then
+      check "07-csv/bookings-clean.csv exists (07-csv/ is a symlink, not a real directory)" fail
+    elif [[ -L "$OUTPUT_FILE" ]]; then
+      check "07-csv/bookings-clean.csv exists (found a symlink, not a real file)" fail
+    elif [[ -f "$OUTPUT_FILE" && "$OUTPUT_LINK_COUNT" != "1" ]]; then
+      check "07-csv/bookings-clean.csv exists (found a hard link, not an independently-written file)" fail
+    elif [[ -s "$OUTPUT_FILE" ]]; then
+      check "07-csv/bookings-clean.csv exists and is non-empty" pass
+      LEARNER_FILE_OK=true
+    else
+      check "07-csv/bookings-clean.csv exists and is non-empty" fail
+    fi
+
+    # 3. The exact required header row, given to the learner verbatim up
+    #    front in the module itself -- an exact string match, not a loose
+    #    one (a reordered or renamed column is not the required header).
+    if [[ "$LEARNER_FILE_OK" == true ]]; then
+      ACTUAL_HEADER="$(sed -n '1p' "$OUTPUT_FILE" 2>/dev/null)"
+      ACTUAL_HEADER="${ACTUAL_HEADER%$'\r'}"
+      # Compare column-by-column, each trimmed, not the raw header string --
+      # same reasoning as trim_field above: "booking_id, name, ..." (a space
+      # after the comma) is the same header to a human as "booking_id,name",
+      # and this module never taught CSV syntax closely enough to make that
+      # distinction load-bearing.
+      ACTUAL_HEADER_TRIMMED="$(printf '%s' "$ACTUAL_HEADER" | awk -F',' '{for(i=1;i<=NF;i++){gsub(/^[ \t]+|[ \t]+$/,"",$i)}; out=$1; for(i=2;i<=NF;i++){out=out","$i}; print out}')"
+      if [[ "$ACTUAL_HEADER_TRIMMED" == "$REQUIRED_HEADER" ]]; then
+        check "bookings-clean.csv has the exact required header row" pass
+      else
+        check "bookings-clean.csv has the exact required header row" fail
+      fi
+    else
+      check "bookings-clean.csv has the exact required header row" fail
+    fi
+
+    # 4. Recompute the true merged set from the two pristine fixtures.
+    #    Garrett's file is read first as the base layer; Penny's file is
+    #    read second and overwrites any ID it shares with Garrett's (her
+    #    copy is authoritative on conflict -- she's the current owner) and
+    #    adds any ID that's hers alone. This IS the merge rule the checker
+    #    enforces, recomputed from pristine fixtures every run, not a hidden
+    #    embedded key.
+    EXPECTED_IDS=()
+    EXPECTED_NAME=()
+    EXPECTED_DATE=()
+    EXPECTED_DEPOSIT=()
+    EXPECTED_BALANCE=()
+    if [[ "$FIXTURES_OK" == true ]]; then
+      for SRC in "$GARRETT_FIXTURE" "$PENNY_FIXTURE"; do
+        FIRST_LINE=true
+        while IFS=',' read -r f_id f_name f_date f_deposit f_balance; do
+          if [[ "$FIRST_LINE" == true ]]; then
+            FIRST_LINE=false
+            continue
+          fi
+          f_id="${f_id%$'\r'}"
+          f_balance="${f_balance%$'\r'}"
+          [[ -z "$f_id" ]] && continue
+          IDX="-1"
+          if [[ "${#EXPECTED_IDS[@]}" -gt 0 ]]; then
+            IDX="$(array_index_of "$f_id" "${EXPECTED_IDS[@]}")"
+          fi
+          if [[ "$IDX" -ge 0 ]]; then
+            EXPECTED_NAME[$IDX]="$f_name"
+            EXPECTED_DATE[$IDX]="$f_date"
+            EXPECTED_DEPOSIT[$IDX]="$f_deposit"
+            EXPECTED_BALANCE[$IDX]="$f_balance"
+          else
+            EXPECTED_IDS+=("$f_id")
+            EXPECTED_NAME+=("$f_name")
+            EXPECTED_DATE+=("$f_date")
+            EXPECTED_DEPOSIT+=("$f_deposit")
+            EXPECTED_BALANCE+=("$f_balance")
+          fi
+        done < "$SRC"
+      done
+    fi
+    EXPECTED_COUNT="${#EXPECTED_IDS[@]}"
+
+    # 5. Parse the learner's own output into matching arrays, preserving
+    #    every row exactly as found (including a duplicate, if there is
+    #    one) so the checks below can catch a duplicate or a dropped row
+    #    instead of silently deduping the learner's own mistake away.
+    ACTUAL_IDS=()
+    ACTUAL_NAME=()
+    ACTUAL_DATE=()
+    ACTUAL_DEPOSIT=()
+    ACTUAL_BALANCE=()
+    ACTUAL_TOTAL=()
+    if [[ "$LEARNER_FILE_OK" == true ]]; then
+      FIRST_LINE=true
+      while IFS=',' read -r a_id a_name a_date a_deposit a_balance a_total; do
+        if [[ "$FIRST_LINE" == true ]]; then
+          FIRST_LINE=false
+          continue
+        fi
+        a_total="${a_total%$'\r'}"
+        a_id="$(trim_field "$a_id")"
+        a_name="$(trim_field "$a_name")"
+        a_date="$(trim_field "$a_date")"
+        a_deposit="$(trim_field "$a_deposit")"
+        a_balance="$(trim_field "$a_balance")"
+        a_total="$(trim_field "$a_total")"
+        if [[ -z "$a_id" && -z "$a_name" && -z "$a_date" && -z "$a_deposit" && -z "$a_balance" && -z "$a_total" ]]; then
+          continue
+        fi
+        ACTUAL_IDS+=("$a_id")
+        ACTUAL_NAME+=("$a_name")
+        ACTUAL_DATE+=("$a_date")
+        ACTUAL_DEPOSIT+=("$a_deposit")
+        ACTUAL_BALANCE+=("$a_balance")
+        ACTUAL_TOTAL+=("$a_total")
+      done < "$OUTPUT_FILE"
+    fi
+    ACTUAL_COUNT="${#ACTUAL_IDS[@]}"
+
+    # 6. Row count equals the checker's own recomputed post-dedup count.
+    if [[ "$FIXTURES_OK" == true && "$LEARNER_FILE_OK" == true && "$ACTUAL_COUNT" -eq "$EXPECTED_COUNT" ]]; then
+      check "row count matches the recomputed post-dedup count ($EXPECTED_COUNT)" pass
+    else
+      check "row count matches the recomputed post-dedup count ($EXPECTED_COUNT, found $ACTUAL_COUNT)" fail
+    fi
+
+    # 7. Closed-set comparison: the booking-ID set in bookings-clean.csv
+    #    exactly equals the recomputed expected set -- no lost rows (an
+    #    expected ID missing from the learner's file) and no invented rows
+    #    (a learner ID that doesn't correspond to any real booking in either
+    #    fixture). Checked both directions, index-based rather than array-
+    #    expansion-based throughout, so a zero-length array on either side
+    #    never gets expanded directly under this script's `set -u`.
+    ID_SET_OK=true
+    if [[ "$FIXTURES_OK" != true || "$LEARNER_FILE_OK" != true ]]; then
+      ID_SET_OK=false
+    else
+      i=0
+      while [[ $i -lt $EXPECTED_COUNT ]]; do
+        eid="${EXPECTED_IDS[$i]}"
+        IDX="-1"
+        if [[ "${#ACTUAL_IDS[@]}" -gt 0 ]]; then
+          IDX="$(array_index_of "$eid" "${ACTUAL_IDS[@]}")"
+        fi
+        [[ "$IDX" -lt 0 ]] && ID_SET_OK=false
+        i=$((i + 1))
+      done
+      i=0
+      while [[ $i -lt $ACTUAL_COUNT ]]; do
+        aid="${ACTUAL_IDS[$i]}"
+        IDX="-1"
+        if [[ "${#EXPECTED_IDS[@]}" -gt 0 ]]; then
+          IDX="$(array_index_of "$aid" "${EXPECTED_IDS[@]}")"
+        fi
+        [[ "$IDX" -lt 0 ]] && ID_SET_OK=false
+        i=$((i + 1))
+      done
+    fi
+    if [[ "$ID_SET_OK" == true ]]; then
+      check "the booking-ID set exactly matches the recomputed expected set (no lost rows, no invented rows)" pass
+    else
+      check "the booking-ID set exactly matches the recomputed expected set (no lost rows, no invented rows)" fail
+    fi
+
+    # 8. For every surviving ID, name/event_date/deposit/balance exactly
+    #    match that ID's source-of-truth value under the stated merge rule
+    #    (Penny's copy wins on conflict) -- exact string comparison, not a
+    #    substring or a loose numeric comparison.
+    FIELDS_OK=true
+    if [[ "$FIXTURES_OK" != true || "$LEARNER_FILE_OK" != true || "$ID_SET_OK" != true ]]; then
+      FIELDS_OK=false
+    else
+      i=0
+      while [[ $i -lt $EXPECTED_COUNT ]]; do
+        eid="${EXPECTED_IDS[$i]}"
+        IDX="-1"
+        if [[ "${#ACTUAL_IDS[@]}" -gt 0 ]]; then
+          IDX="$(array_index_of "$eid" "${ACTUAL_IDS[@]}")"
+        fi
+        if [[ "$IDX" -lt 0 ]]; then
+          FIELDS_OK=false
+        else
+          [[ "${ACTUAL_NAME[$IDX]}" != "${EXPECTED_NAME[$i]}" ]] && FIELDS_OK=false
+          [[ "${ACTUAL_DATE[$IDX]}" != "${EXPECTED_DATE[$i]}" ]] && FIELDS_OK=false
+          [[ "${ACTUAL_DEPOSIT[$IDX]}" != "${EXPECTED_DEPOSIT[$i]}" ]] && FIELDS_OK=false
+          [[ "${ACTUAL_BALANCE[$IDX]}" != "${EXPECTED_BALANCE[$i]}" ]] && FIELDS_OK=false
+        fi
+        i=$((i + 1))
+      done
+    fi
+    if [[ "$FIELDS_OK" == true ]]; then
+      check "every surviving booking's name/event_date/deposit/balance exactly match the source of truth (Penny's copy wins on conflict)" pass
+    else
+      check "every surviving booking's name/event_date/deposit/balance exactly match the source of truth (Penny's copy wins on conflict)" fail
+    fi
+
+    # 9. total_due is arithmetically correct per row: deposit + balance,
+    #    recomputed by the checker from that row's own deposit/balance
+    #    values. An internal-consistency check, independent of check 8
+    #    above -- a row with the wrong deposit still needs the right sum of
+    #    whatever it actually wrote. Deposit/balance/total_due are plain
+    #    whole-dollar integers in this module's fixtures, so plain bash
+    #    arithmetic (no bc/awk float dependency) is exact here; each value
+    #    is validated as an integer string first so a non-numeric or
+    #    empty field fails cleanly instead of crashing the arithmetic.
+    TOTAL_OK=true
+    if [[ "$LEARNER_FILE_OK" != true || "$ACTUAL_COUNT" -eq 0 ]]; then
+      TOTAL_OK=false
+    else
+      i=0
+      while [[ $i -lt $ACTUAL_COUNT ]]; do
+        dep="${ACTUAL_DEPOSIT[$i]}"
+        bal="${ACTUAL_BALANCE[$i]}"
+        tot="${ACTUAL_TOTAL[$i]}"
+        if [[ "$dep" =~ ^-?[0-9]+$ && "$bal" =~ ^-?[0-9]+$ && "$tot" =~ ^-?[0-9]+$ ]]; then
+          ROW_EXPECTED_TOTAL=$((dep + bal))
+          [[ "$tot" != "$ROW_EXPECTED_TOTAL" ]] && TOTAL_OK=false
+        else
+          TOTAL_OK=false
+        fi
+        i=$((i + 1))
+      done
+    fi
+    if [[ "$TOTAL_OK" == true ]]; then
+      check "every row's total_due equals deposit + balance" pass
+    else
+      check "every row's total_due equals deposit + balance" fail
+    fi
+
+    # 10. Own-words write-up: presence-checked for genuine content, same
+    #     discipline as every other module's answers file (rejects the
+    #     literal placeholder text copied verbatim from the module page,
+    #     and rejects a symlink or hard link standing in for a real file).
+    ANSWERS07="$ROOT/07-csv/answers.txt"
+    ANSWERS07_LINK_COUNT="$(stat -f '%l' "$ANSWERS07" 2>/dev/null || stat -c '%h' "$ANSWERS07" 2>/dev/null || echo "1")"
+    PLACEHOLDER_RULE07="<in your own words, what did the merge rule do whenever a booking ID showed up in both files?>"
+    PLACEHOLDER_PAIRS07="<name at least one booking ID that appeared in both files, and say what happened to it>"
+    PLACEHOLDER_LOST07="<how did you satisfy yourself that nobody's booking went missing?>"
+    if [[ "$OUTPUT_DIR_OK" == false ]]; then
+      check "07-csv/answers.txt has all three reflection answers, in your own words (07-csv/ is a symlink, not a real directory)" fail
+    elif [[ -L "$ANSWERS07" ]]; then
+      check "07-csv/answers.txt has all three reflection answers, in your own words (found a symlink, not a real file)" fail
+    elif [[ -f "$ANSWERS07" && "$ANSWERS07_LINK_COUNT" != "1" ]]; then
+      check "07-csv/answers.txt has all three reflection answers, in your own words (found a hard link, not an independently-written file)" fail
+    elif [[ -f "$ANSWERS07" ]]; then
+      MISSING_LABELS=()
+      # Bash-3.2-safe case statement, not an associative array -- see the
+      # matching comment on Module 01's identical pattern, above.
+      for label in "DEDUP_RULE:" "COLLAPSED_PAIRS:" "VERIFIED_NOTHING_LOST:"; do
+        case "$label" in
+          "DEDUP_RULE:") EXPECTED_PLACEHOLDER="$PLACEHOLDER_RULE07" ;;
+          "COLLAPSED_PAIRS:") EXPECTED_PLACEHOLDER="$PLACEHOLDER_PAIRS07" ;;
+          "VERIFIED_NOTHING_LOST:") EXPECTED_PLACEHOLDER="$PLACEHOLDER_LOST07" ;;
+        esac
+        LINE="$(grep -m1 "^$label" "$ANSWERS07" 2>/dev/null || true)"
+        VALUE="$(echo "$LINE" | sed "s/^$label//" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+        if [[ -z "$VALUE" || "$VALUE" == "$EXPECTED_PLACEHOLDER" ]]; then
+          MISSING_LABELS+=("$label")
+        fi
+      done
+      if [[ "${#MISSING_LABELS[@]}" -eq 0 ]]; then
+        check "07-csv/answers.txt has all three reflection answers, in your own words" pass
+      else
+        check "07-csv/answers.txt has all three reflection answers, in your own words (still needed: ${MISSING_LABELS[*]})" fail
+      fi
+    else
+      check "07-csv/answers.txt has all three reflection answers, in your own words" fail
     fi
     ;;
   *)
