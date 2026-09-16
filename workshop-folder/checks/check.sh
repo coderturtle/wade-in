@@ -122,6 +122,7 @@ file_inode() {
 # (and note why, in a commit message) any time a fixture's real content
 # changes -- never let it silently drift from what's actually on disk.
 EXPECTED_WELCOME_NOTE_SHA256="f9f6b278a9732f0dbcc0969414f34d7365942ce8e8aea705775a5e933b8e7475"
+EXPECTED_VENUE_HISTORY_SHA256="3afe8aea8f84e6fff4da67c0f48d14b7956c6630ff06756c2ea2bb6180eec7a5"
 
 echo "-- Wade In required checklist: Module $MODULE ------------------------"
 echo ""
@@ -267,6 +268,152 @@ case "$MODULE" in
       fi
     else
       check "01-terminal/answers.txt has all three reflection answers, in your own words" fail
+    fi
+    ;;
+  02)
+    # 1. 02-meet/ itself is a real directory, not a symlink standing in for
+    #    one -- mirrors Module 01's `01-terminal/my-notes/` check. Reproduced
+    #    by a cross-model review: a symlinked `02-meet -> /some/outside/dir`
+    #    passed every downstream check, meaning the apparent workshop output
+    #    could actually live outside the sandbox entirely.
+    EXPECTED_02_MEET="$ROOT/02-meet"
+    MEET_DIR_OK=true
+    if [[ -e "$EXPECTED_02_MEET" ]]; then
+      REAL_02_MEET="$(cd "$EXPECTED_02_MEET" 2>/dev/null && pwd -P || echo "")"
+      if [[ "$REAL_02_MEET" != "$EXPECTED_02_MEET" ]]; then
+        MEET_DIR_OK=false
+      fi
+    fi
+
+    # 2. 02-meet/summary.txt exists for real -- not a symlink, and not a hard
+    #    link either (checked via link count, not by comparing against one
+    #    specific reference file the way Module 01 does for its fixture copy
+    #    -- this file is learner/Claude-Code-authored, not copied from
+    #    anywhere, so there's no single fixture inode to compare against;
+    #    any link count above 1 means some other path shares these exact
+    #    bytes, which a freshly-written file never does). Reproduced: hard-
+    #    linking summary.txt and answers.txt to the same outside file, both
+    #    passed identically to two real, independently-written files.
+    SUMMARY="$ROOT/02-meet/summary.txt"
+    SUMMARY_LINK_COUNT="$(stat -f '%l' "$SUMMARY" 2>/dev/null || stat -c '%h' "$SUMMARY" 2>/dev/null || echo "1")"
+    if [[ "$MEET_DIR_OK" == false ]]; then
+      check "02-meet/summary.txt exists and is non-empty (02-meet/ is a symlink, not a real directory)" fail
+    elif [[ -L "$SUMMARY" ]]; then
+      check "02-meet/summary.txt exists and is non-empty (found a symlink, not a real file)" fail
+    elif [[ -f "$SUMMARY" && "$SUMMARY_LINK_COUNT" != "1" ]]; then
+      check "02-meet/summary.txt exists and is non-empty (found a hard link, not an independently-written file)" fail
+    elif [[ -s "$SUMMARY" ]]; then
+      check "02-meet/summary.txt exists and is non-empty" pass
+    else
+      check "02-meet/summary.txt exists and is non-empty" fail
+    fi
+    SUMMARY_REAL_FILE=false
+    [[ "$MEET_DIR_OK" == true && -f "$SUMMARY" && ! -L "$SUMMARY" && "$SUMMARY_LINK_COUNT" == "1" ]] && SUMMARY_REAL_FILE=true
+
+    # 3. It's 3-5 lines -- counting real content lines, not blank ones, so a
+    #    trailing blank line from an editor doesn't wrongly fail a genuine
+    #    3-5-line summary. "Line" means an actual line break, which is why
+    #    the module's own suggested prompt explicitly asks for separate
+    #    lines rather than a paragraph -- confirmed live against the real
+    #    `claude` CLI that a vaguer prompt reliably produces flowing prose
+    #    that fails this check on a perfectly correct, honest summary.
+    if [[ "$SUMMARY_REAL_FILE" == true ]]; then
+      NONBLANK_LINES="$(grep -cv '^[[:space:]]*$' "$SUMMARY" 2>/dev/null || echo 0)"
+      if [[ "$NONBLANK_LINES" -ge 3 && "$NONBLANK_LINES" -le 5 ]]; then
+        check "summary.txt is 3-5 lines long (found $NONBLANK_LINES)" pass
+      else
+        check "summary.txt is 3-5 lines long (found $NONBLANK_LINES)" fail
+      fi
+    else
+      check "summary.txt is 3-5 lines long" fail
+    fi
+
+    # 4 & 5. The summary contains the venue's founding year and current
+    #    capacity -- both re-derived from the fixture itself at check time
+    #    (never an embedded key), so the check stays correct if the fixture's
+    #    *values* ever change, and so it's actually testing whether the
+    #    summary reflects the real source, not whether the learner guessed a
+    #    number this script happens to have memorized. The fixture itself is
+    #    checksum-verified first (see EXPECTED_VENUE_HISTORY_SHA256) -- a
+    #    tampered fixture (e.g. edited to claim a founding year of 9999) was
+    #    demonstrated to make the checker faithfully "verify" a summary
+    #    against the tampered value instead of the real one, the same class
+    #    of bypass Module 01's embedded checksum already guards against for
+    #    its own fixture.
+    #    Matching extracts every numeric token in the summary (an optional
+    #    leading `-`, digits, an optional `.digits` extension) and requires
+    #    an EXACT match against one of those tokens -- not a word-boundary
+    #    substring match (`\b`), which still treats a hyphen or decimal
+    #    point as a boundary and was demonstrated to accept "founded in
+    #    -1962" or "capacity is 295.9" as containing the real values. Token
+    #    extraction correctly tells a genuine sentence-ending period (the
+    #    token "295" from "...is 295.") apart from a real decimal extension
+    #    (the token "295.9" from "...is 295.9") -- confirmed directly after
+    #    an earlier boundary-character version of this fix wrongly rejected
+    #    the first, ordinary case.
+    HISTORY_FIXTURE="$ROOT/fixtures/venue-history.txt"
+    HISTORY_SUM="$(file_checksum "$HISTORY_FIXTURE" 2>/dev/null || echo "MISSING_FIXTURE")"
+    if [[ "$HISTORY_SUM" != "$EXPECTED_VENUE_HISTORY_SHA256" ]]; then
+      check "summary.txt includes the founding year (workshop fixture doesn't match its expected content - contact the workshop, not your own mistake)" fail
+      check "summary.txt includes the current capacity (workshop fixture doesn't match its expected content - contact the workshop, not your own mistake)" fail
+    else
+      FOUNDING_YEAR="$(grep -oE 'Double Deuce in [0-9]{4}' "$HISTORY_FIXTURE" 2>/dev/null | grep -oE '[0-9]{4}')"
+      CAPACITY="$(grep -oE 'fire marshal inspection, is [0-9]+' "$HISTORY_FIXTURE" 2>/dev/null | grep -oE '[0-9]+$')"
+      if [[ -z "$FOUNDING_YEAR" || -z "$CAPACITY" ]]; then
+        check "summary.txt includes the founding year (couldn't read it from the workshop fixture - contact the workshop)" fail
+        check "summary.txt includes the current capacity (couldn't read it from the workshop fixture - contact the workshop)" fail
+      else
+        if [[ "$SUMMARY_REAL_FILE" == true ]] && grep -oE -- '-?[0-9]+(\.[0-9]+)?' "$SUMMARY" 2>/dev/null | grep -qxF "$FOUNDING_YEAR"; then
+          check "summary.txt includes the founding year ($FOUNDING_YEAR)" pass
+        else
+          check "summary.txt includes the founding year ($FOUNDING_YEAR)" fail
+        fi
+        if [[ "$SUMMARY_REAL_FILE" == true ]] && grep -oE -- '-?[0-9]+(\.[0-9]+)?' "$SUMMARY" 2>/dev/null | grep -qxF "$CAPACITY"; then
+          check "summary.txt includes the current capacity ($CAPACITY)" pass
+        else
+          check "summary.txt includes the current capacity ($CAPACITY)" fail
+        fi
+      fi
+    fi
+
+    # 6. Own-words answers file: same discipline as Module 01 -- presence-
+    #    checked for genuine content, rejecting the literal placeholder text
+    #    from the module page itself, and rejecting a symlink or hard link
+    #    standing in for a real file (same convention as checks 1-2, above).
+    ANSWERS02="$ROOT/02-meet/answers.txt"
+    ANSWERS02_LINK_COUNT="$(stat -f '%l' "$ANSWERS02" 2>/dev/null || stat -c '%h' "$ANSWERS02" 2>/dev/null || echo "1")"
+    PLACEHOLDER_PROMPT02="<what happened when Claude Code asked to create or write the file - what did you see, what did you choose?>"
+    PLACEHOLDER_WHY02="<in your own words, why does Claude Code ask before acting?>"
+    PLACEHOLDER_CHECKED02="<one specific thing you checked yourself before trusting the summary>"
+    if [[ "$MEET_DIR_OK" == false ]]; then
+      check "02-meet/answers.txt has all three reflection answers, in your own words (02-meet/ is a symlink, not a real directory)" fail
+    elif [[ -L "$ANSWERS02" ]]; then
+      check "02-meet/answers.txt has all three reflection answers, in your own words (found a symlink, not a real file)" fail
+    elif [[ -f "$ANSWERS02" && "$ANSWERS02_LINK_COUNT" != "1" ]]; then
+      check "02-meet/answers.txt has all three reflection answers, in your own words (found a hard link, not an independently-written file)" fail
+    elif [[ -f "$ANSWERS02" ]]; then
+      MISSING_LABELS=()
+      # Bash-3.2-safe case statement, not an associative array -- see the
+      # matching comment on Module 01's identical pattern, above, for why.
+      for label in "PERMISSION_PROMPT:" "WHY_ASKS:" "WHAT_I_CHECKED:"; do
+        case "$label" in
+          "PERMISSION_PROMPT:") EXPECTED_PLACEHOLDER="$PLACEHOLDER_PROMPT02" ;;
+          "WHY_ASKS:") EXPECTED_PLACEHOLDER="$PLACEHOLDER_WHY02" ;;
+          "WHAT_I_CHECKED:") EXPECTED_PLACEHOLDER="$PLACEHOLDER_CHECKED02" ;;
+        esac
+        LINE="$(grep -m1 "^$label" "$ANSWERS02" 2>/dev/null || true)"
+        VALUE="$(echo "$LINE" | sed "s/^$label//" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+        if [[ -z "$VALUE" || "$VALUE" == "$EXPECTED_PLACEHOLDER" ]]; then
+          MISSING_LABELS+=("$label")
+        fi
+      done
+      if [[ "${#MISSING_LABELS[@]}" -eq 0 ]]; then
+        check "02-meet/answers.txt has all three reflection answers, in your own words" pass
+      else
+        check "02-meet/answers.txt has all three reflection answers, in your own words (still needed: ${MISSING_LABELS[*]})" fail
+      fi
+    else
+      check "02-meet/answers.txt has all three reflection answers, in your own words" fail
     fi
     ;;
   *)
