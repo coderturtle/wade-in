@@ -77,11 +77,17 @@ deployment:
   pages_host: coderturtle.github.io
   repo: coderturtle/wade-in
   create_domain_verification: true
+  pages_enabled: true
+  custom_domain_set: true
   # Onboarded as the eighth github-pages-dns consumer, agentic-infra-lab PR #15
-  # (dermdunc/agentic-infra-lab), 2026-09-16. terraform plan is GREEN (1 create,
-  # CNAME only) and awaiting human `terraform apply` — not yet applied. The
-  # TXT domain-verification record and the human_confirmed/applied_date/
-  # pages_enabled/etc. fields (matching copilot-fluent's own recorded shape)
-  # get filled in after that apply and the GitHub-side steps are confirmed,
-  # not before.
+  # (dermdunc/agentic-infra-lab), 2026-09-16. Repo-side: Pages enabled
+  # (build_type: workflow) and custom domain set via `gh api POST` then `PUT
+  # repos/coderturtle/wade-in/pages`, using the human's own authenticated gh
+  # session (not GITHUB_TOKEN) - confirmed via
+  # `gh api repos/coderturtle/wade-in/pages` directly. terraform plan is
+  # GREEN (1 create, CNAME only) and awaiting human `terraform apply` - not
+  # yet applied. record_fqdn/verification_record_fqdn/human_confirmed/
+  # applied_date/protected_domain_state/https_certificate_state (matching
+  # copilot-fluent's own recorded shape) get filled in after that apply and
+  # GitHub's account-level domain verification are both confirmed, not before.
 
