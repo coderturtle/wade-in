@@ -3276,6 +3276,62 @@ case "$MODULE" in
       check "zero unfilled template placeholders across the VIP letters (no letter files found to check)" fail
     fi
 
+    # === Safety-rehearsal gate (Module 09's ritual, fresh scenario) ===========
+    # Added 2026-09-16, this workshop's own Module 09/10 safety remediation:
+    # Module 09's own closing line used to just ask learners to "re-read" its
+    # ritual before finishing the capstone -- unchecked, unenforced, easy to
+    # skim past. This applies the same own-words-plus-closed-set pattern
+    # Module 09's own safety quiz uses, but against a DIFFERENT scenario, so
+    # passing requires applying the ritual fresh rather than recalling
+    # Module 09's own six situations from memory. Honest limit, named
+    # plainly in this module's own text: a 6-choose-N closed set can be
+    # brute-forced against repeated checker runs; WHY_RISKY can't be graded
+    # for correctness by this script, only for genuine presence, the same
+    # way every other own-words field in this workshop works.
+    RITUAL_FILE="$ROOT/10-capstone/ritual-rehearsal.txt"
+    RITUAL_LINK_COUNT="$(stat -f '%l' "$RITUAL_FILE" 2>/dev/null || stat -c '%h' "$RITUAL_FILE" 2>/dev/null || echo "1")"
+    RITUAL_FILE_OK=false
+    if [[ -L "$RITUAL_FILE" ]]; then
+      check "10-capstone/ritual-rehearsal.txt selects exactly the right safe actions (found a symlink, not a real file)" fail
+    elif [[ -f "$RITUAL_FILE" && "$RITUAL_LINK_COUNT" != "1" ]]; then
+      check "10-capstone/ritual-rehearsal.txt selects exactly the right safe actions (found a hard link, not an independently-written file)" fail
+    elif [[ -f "$RITUAL_FILE" && -s "$RITUAL_FILE" ]]; then
+      RITUAL_FILE_OK=true
+    else
+      check "10-capstone/ritual-rehearsal.txt selects exactly the right safe actions (not found yet)" fail
+    fi
+
+    if [[ "$RITUAL_FILE_OK" == true ]]; then
+      RITUAL_LINE="$(grep -m1 '^SAFE_ACTIONS:' "$RITUAL_FILE" 2>/dev/null || true)"
+      RITUAL_VALUE="$(printf '%s' "$RITUAL_LINE" | sed 's/^SAFE_ACTIONS:[[:space:]]*//')"
+      RITUAL_NUMS="$(printf '%s' "$RITUAL_VALUE" | grep -oE '[0-9]+' | sort -n)"
+      RITUAL_COUNT="$(printf '%s\n' "$RITUAL_NUMS" | grep -c . || true)"
+      RITUAL_UNIQUE_COUNT="$(printf '%s\n' "$RITUAL_NUMS" | sort -nu | grep -c . || true)"
+      RITUAL_EXPECTED_NUMS="$(printf '1\n3\n5\n')"
+      if [[ -z "$RITUAL_VALUE" ]]; then
+        check "10-capstone/ritual-rehearsal.txt selects exactly the right safe actions (the SAFE_ACTIONS: line is empty)" fail
+      elif [[ "$RITUAL_COUNT" -ne 3 || "$RITUAL_UNIQUE_COUNT" -ne 3 ]]; then
+        check "10-capstone/ritual-rehearsal.txt selects exactly the right safe actions (pick exactly 3 distinct action numbers)" fail
+      elif [[ "$RITUAL_NUMS" == "$RITUAL_EXPECTED_NUMS" ]]; then
+        check "10-capstone/ritual-rehearsal.txt selects exactly the right safe actions" pass
+      else
+        check "10-capstone/ritual-rehearsal.txt selects exactly the right safe actions (that's not the right set of 3 - re-read the six actions against Module 09's own ritual and hard lines)" fail
+      fi
+    fi
+
+    PLACEHOLDER_WHYRISKY10="<name one action you did NOT pick, and say in your own words what specifically about it breaks the ritual>"
+    if [[ "$RITUAL_FILE_OK" == true ]]; then
+      WHYRISKY_LINE="$(grep -m1 '^WHY_RISKY:' "$RITUAL_FILE" 2>/dev/null || true)"
+      WHYRISKY_VALUE="$(echo "$WHYRISKY_LINE" | sed 's/^WHY_RISKY://' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+      if [[ -n "$WHYRISKY_VALUE" && "$WHYRISKY_VALUE" != "$PLACEHOLDER_WHYRISKY10" ]]; then
+        check "10-capstone/ritual-rehearsal.txt explains, in your own words, what makes one unpicked action risky" pass
+      else
+        check "10-capstone/ritual-rehearsal.txt explains, in your own words, what makes one unpicked action risky" fail
+      fi
+    else
+      check "10-capstone/ritual-rehearsal.txt explains, in your own words, what makes one unpicked action risky (can't check until the file itself is valid, see above)" fail
+    fi
+
     # === Pack completeness gate ===
     # Checks what modules 01-09 actually ask the learner to produce: three
     # exactly-named files (Modules 01/02, 04, 09), the root CLAUDE.md's Module
